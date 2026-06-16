@@ -3,8 +3,10 @@ from fastapi import APIRouter
 from app.api import (
     admin,
     auth,
+    comment,
     course_builder,
     dictionary,
+    feedback,
     gamification,
     microlearning,
     notification,
@@ -27,3 +29,5 @@ api_router.include_router(microlearning.router)
 api_router.include_router(course_builder.router)
 api_router.include_router(notification.router)
 api_router.include_router(user.router)
+api_router.include_router(comment.router)
+api_router.include_router(feedback.router)
