@@ -42,3 +42,11 @@ npm-debug.log*
 
 # Vite cache
 frontend/.vite/
+
+# Phase planning docs (tracked in memory, not in repo)
+docs/Ke_hoach_hoan_thien_codebase.md
+docs/Phase_1_Step_by_Step.md
+docs/Phase_2_Step_by_Step.md
+docs/Phase_3_Step_by_Step.md
+docs/Phase_4_Step_by_Step.md
+docs/Phase_5_Step_by_Step.md
