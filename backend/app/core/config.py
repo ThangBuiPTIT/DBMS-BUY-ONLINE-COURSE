@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-to-a-random-secret"
     SESSION_EXPIRE_HOURS: int = 24
 
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_ENABLED: bool = False  # Bật/tắt bằng env var
+    SESSION_CACHE_TTL_HOURS: int = 24
+    LEADERBOARD_REFRESH_MINUTES: int = 5
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

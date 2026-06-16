@@ -68,3 +68,14 @@ async def create_achievement(
 @router.post("/streak/{student_id}/sync")
 async def sync_streak(student_id: str, db: AsyncSession = Depends(get_db)):
     return await gamification_service.sync_student_streak(db, student_id)
+
+
+# ── Phase 5: Leaderboard refresh (admin only) ──
+
+@router.post("/leaderboard/refresh")
+async def refresh_leaderboard(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    await gamification_service.refresh_leaderboard(db)
+    return {"message": "Leaderboard refreshed successfully"}

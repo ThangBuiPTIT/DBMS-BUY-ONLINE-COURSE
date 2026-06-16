@@ -3,28 +3,58 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache
+
 
 async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
-    """Get top learners leaderboard."""
-    result = await db.execute(
-        text("""
-            SELECT
-                full_name,
-                COALESCE(avatar_url, '') AS avatar_url,
-                current_streak,
-                highest_streak,
-                total_achievements
-            FROM vw_top_learners_leaderboard
-            LIMIT :limit
-        """),
-        {"limit": limit},
-    )
-    entries = []
-    for rank, row in enumerate(result.mappings(), start=1):
-        entry = dict(row)
-        entry["rank"] = rank
-        entries.append(entry)
-    return entries
+    """Get top learners leaderboard — ưu tiên Redis ZSET, fallback Materialized View."""
+    # Try Redis ZSET first
+    if cache.enabled:
+        redis_entries = await cache.get_top_learners(limit)
+        if redis_entries:
+            return [
+                {"rank": i + 1, **entry} for i, entry in enumerate(redis_entries)
+            ]
+
+    # Fallback to Materialized View
+    try:
+        result = await db.execute(
+            text("SELECT * FROM mv_leaderboard ORDER BY rank ASC LIMIT :limit"),
+            {"limit": limit},
+        )
+        return [dict(row) for row in result.mappings()]
+    except Exception:
+        # Fallback to view if mv doesn't exist yet
+        result = await db.execute(
+            text("""
+                SELECT
+                    full_name,
+                    COALESCE(avatar_url, '') AS avatar_url,
+                    current_streak,
+                    highest_streak,
+                    total_achievements
+                FROM vw_top_learners_leaderboard
+                LIMIT :limit
+            """),
+            {"limit": limit},
+        )
+        entries = []
+        for rank, row in enumerate(result.mappings(), start=1):
+            entry = dict(row)
+            entry["rank"] = rank
+            entries.append(entry)
+        return entries
+
+
+async def refresh_leaderboard(db: AsyncSession) -> None:
+    """Refresh materialized view + Redis cache. Gọi định kỳ hoặc sau khi sync streak."""
+    await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_leaderboard"))
+    await db.commit()
+
+    # Đồng bộ Redis ZSET
+    if cache.enabled:
+        result = await db.execute(text("SELECT * FROM mv_leaderboard ORDER BY rank ASC"))
+        await cache.update_leaderboard([dict(row) for row in result.mappings()])
 
 
 async def get_student_streak(db: AsyncSession, student_id: str) -> dict:

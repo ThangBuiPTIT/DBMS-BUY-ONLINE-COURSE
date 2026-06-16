@@ -1,9 +1,18 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache
+
 
 async def search_entries(db: AsyncSession, keyword: str) -> list[dict]:
-    """Search dictionary entries (ILIKE on word and meaning) with batch variations."""
+    """Search dictionary entries (ILIKE on word and meaning) with batch variations.
+    Uses Redis cache for repeated queries (Phase 5)."""
+    # Try cache first
+    if cache.enabled and keyword:
+        cached = await cache.get_dict_search(keyword)
+        if cached is not None:
+            return cached
+
     result = await db.execute(
         text("""
             SELECT
@@ -56,6 +65,10 @@ async def search_entries(db: AsyncSession, keyword: str) -> list[dict]:
 
     for entry in entries:
         entry["variations"] = variations_map.get(entry["entry_id"], [])
+
+    # Store in cache
+    if cache.enabled and keyword and entries:
+        await cache.set_dict_search(keyword, entries)
 
     return entries
 

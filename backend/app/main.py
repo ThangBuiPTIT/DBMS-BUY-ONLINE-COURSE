@@ -1,10 +1,12 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.router import api_router
+from app.core.cache import cache
 from app.core.config import settings
 from app.core.database import engine
-from app.api.router import api_router
 
 
 @asynccontextmanager
@@ -15,8 +17,15 @@ async def lifespan(app: FastAPI):
             __import__("sqlalchemy").text("SELECT 1")
         )
         print(f"Database connected: {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+    # Redis connect
+    if settings.REDIS_ENABLED:
+        await cache.connect()
+        print("Redis connected")
     yield
     # Shutdown
+    if settings.REDIS_ENABLED:
+        await cache.disconnect()
+        print("Redis disconnected")
     await engine.dispose()
     print("Database disconnected")
 
