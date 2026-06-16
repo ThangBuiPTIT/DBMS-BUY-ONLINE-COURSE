@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api import (
     admin,
     auth,
+    certificate,
     comment,
     course_builder,
     dictionary,
@@ -31,3 +32,4 @@ api_router.include_router(notification.router)
 api_router.include_router(user.router)
 api_router.include_router(comment.router)
 api_router.include_router(feedback.router)
+api_router.include_router(certificate.router)

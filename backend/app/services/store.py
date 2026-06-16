@@ -77,3 +77,82 @@ async def checkout_course(db: AsyncSession, student_id: str, course_id: str) -> 
         if "Khóa học không tồn tại" in err_msg:
             raise StoreError("Khóa học không tồn tại", 400)
         raise StoreError(err_msg, 500)
+
+
+# ── Phase 4: Refund & Transactions ──
+
+async def refund_course(db: AsyncSession, student_id: str, course_id: str, reason: str = "") -> None:
+    """Admin hoàn tiền khóa học. Gọi sp_refund_course với advisory lock chống race condition."""
+    try:
+        import uuid as _uuid
+        course_int = _uuid.UUID(course_id).int % (2**63 - 1)
+        await db.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_id)"),
+            {"lock_id": course_int},
+        )
+
+        await db.execute(
+            text("CALL sp_refund_course(:sid, :cid)"),
+            {"sid": student_id, "cid": course_id},
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise StoreError(str(e), 500)
+
+
+async def get_user_transactions(
+    db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0
+) -> dict:
+    """Lịch sử giao dịch của một user — cả tiền gửi và nhận."""
+    count_result = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM transaction_logs
+            WHERE (from_wallet_user_id = :uid OR to_wallet_user_id = :uid)
+              AND status = 'SUCCESS'
+        """),
+        {"uid": user_id},
+    )
+    total = count_result.scalar()
+
+    result = await db.execute(
+        text("""
+            SELECT
+                tl.transaction_id::text,
+                tl.created_at,
+                tl.amount,
+                tl.status,
+                tl.message,
+                CASE
+                    WHEN tl.from_wallet_user_id = :uid THEN 'OUT'
+                    ELSE 'IN'
+                END AS direction,
+                c.title AS related_course,
+                CASE
+                    WHEN tl.from_wallet_user_id = :uid THEN
+                        COALESCE(
+                            (SELECT full_name FROM user_profiles WHERE user_id = tl.to_wallet_user_id),
+                            'Hệ thống'
+                        )
+                    ELSE
+                        COALESCE(
+                            (SELECT full_name FROM user_profiles WHERE user_id = tl.from_wallet_user_id),
+                            'Hệ thống'
+                        )
+                END AS counterparty_name
+            FROM transaction_logs tl
+            LEFT JOIN general_courses c ON tl.related_course_id = c.course_id
+            WHERE (tl.from_wallet_user_id = :uid OR tl.to_wallet_user_id = :uid)
+              AND tl.status = 'SUCCESS'
+            ORDER BY tl.created_at DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        {"uid": user_id, "limit": limit, "offset": offset},
+    )
+
+    return {
+        "transactions": [dict(row) for row in result.mappings()],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }

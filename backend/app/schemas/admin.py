@@ -42,3 +42,21 @@ class BanRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# ── Phase 4: Certificate, Completion Rate ──
+
+class CertificateEligibilityResponse(BaseModel):
+    student_id: str
+    course_id: str
+    eligible: bool
+    current_progress: float
+    remaining: float
+
+
+class CompletionRateResponse(BaseModel):
+    course_id: str
+    course_title: str
+    total_enrolled: int
+    completed: int
+    completion_rate: float

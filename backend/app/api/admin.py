@@ -36,3 +36,28 @@ async def ban_user(
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"message": "Khóa tài khoản người dùng thành công"}
+
+
+# ── Phase 4: Wallet Audit & Completion Rate ──
+
+@router.get("/wallets/{user_id}/audit")
+async def audit_wallet(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    try:
+        return await admin_service.audit_wallet_balance(db, user_id)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.get("/courses/{course_id}/completion-rate")
+async def course_completion_rate(
+    course_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await admin_service.get_course_completion_rate(db, course_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
