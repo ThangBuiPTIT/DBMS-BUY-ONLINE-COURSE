@@ -1,5 +1,6 @@
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.security import create_session_key, get_session_expiry, hash_password, verify_password
 from app.models.user import AuthenticationSession, Role, User
@@ -11,7 +12,7 @@ async def authenticate_admin(
     """Authenticate an admin user. Returns (session_key, user_info_dict)."""
     result = await db.execute(
         select(User)
-        .join(Role)
+        .options(joinedload(User.role))
         .where(User.username == username, User.is_deleted == False)
     )
     user = result.scalar_one_or_none()

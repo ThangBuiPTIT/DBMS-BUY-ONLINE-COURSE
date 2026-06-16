@@ -19,7 +19,7 @@ class StoreCourseResponse(BaseModel):
 class WalletInfoResponse(BaseModel):
     user_id: str
     balance: float
-    updated_at: datetime
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

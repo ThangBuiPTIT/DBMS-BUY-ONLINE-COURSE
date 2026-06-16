@@ -1,9 +1,11 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import is_valid_uuid
 
 
 async def get_store_courses(db: AsyncSession, student_id: str) -> list[dict]:
     """Get published courses for the storefront."""
+    clean_student_id = student_id if is_valid_uuid(student_id) else "00000000-0000-0000-0000-000000000000"
     result = await db.execute(
         text("""
             SELECT
@@ -21,13 +23,16 @@ async def get_store_courses(db: AsyncSession, student_id: str) -> list[dict]:
             WHERE c.visibility_status = 'PUBLISHED' AND c.is_deleted = FALSE
             ORDER BY c.updated_at DESC
         """),
-        {"student_id": student_id},
+        {"student_id": clean_student_id},
     )
     return [dict(row) for row in result.mappings()]
 
 
 async def get_wallet(db: AsyncSession, user_id: str) -> dict:
     """Get wallet balance. Auto-creates wallet with 0 balance if not found."""
+    if not is_valid_uuid(user_id):
+        return {"user_id": user_id, "balance": 0.0, "updated_at": None}
+
     result = await db.execute(
         text("SELECT user_id::text, balance, updated_at FROM wallets WHERE user_id = :uid"),
         {"uid": user_id},
@@ -48,6 +53,8 @@ async def get_wallet(db: AsyncSession, user_id: str) -> dict:
 
 async def topup_wallet(db: AsyncSession, user_id: str, amount: float, message: str) -> None:
     """Top up wallet by calling sp_topup_wallet procedure."""
+    if not is_valid_uuid(user_id):
+        raise StoreError("User không tồn tại", 400)
     await db.execute(
         text("CALL sp_topup_wallet(:uid, :amt, :msg)"),
         {"uid": user_id, "amt": amount, "msg": message},
@@ -63,6 +70,8 @@ class StoreError(Exception):
 
 async def checkout_course(db: AsyncSession, student_id: str, course_id: str) -> None:
     """Buy a course using wallet balance. Calls sp_buy_course_with_wallet."""
+    if not is_valid_uuid(student_id) or not is_valid_uuid(course_id):
+        raise StoreError("ID không hợp lệ", 400)
     try:
         await db.execute(
             text("CALL sp_buy_course_with_wallet(:sid, :cid)"),
@@ -83,6 +92,8 @@ async def checkout_course(db: AsyncSession, student_id: str, course_id: str) -> 
 
 async def refund_course(db: AsyncSession, student_id: str, course_id: str, reason: str = "") -> None:
     """Admin hoàn tiền khóa học. Gọi sp_refund_course với advisory lock chống race condition."""
+    if not is_valid_uuid(student_id) or not is_valid_uuid(course_id):
+        raise StoreError("ID không hợp lệ", 400)
     try:
         import uuid as _uuid
         course_int = _uuid.UUID(course_id).int % (2**63 - 1)
@@ -105,6 +116,14 @@ async def get_user_transactions(
     db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0
 ) -> dict:
     """Lịch sử giao dịch của một user — cả tiền gửi và nhận."""
+    if not is_valid_uuid(user_id):
+        return {
+            "transactions": [],
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+        }
+
     count_result = await db.execute(
         text("""
             SELECT COUNT(*) FROM transaction_logs

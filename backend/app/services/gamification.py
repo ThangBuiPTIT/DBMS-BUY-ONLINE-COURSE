@@ -4,6 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache
+from app.core.security import is_valid_uuid
 
 
 async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
@@ -59,6 +60,14 @@ async def refresh_leaderboard(db: AsyncSession) -> None:
 
 async def get_student_streak(db: AsyncSession, student_id: str) -> dict:
     """Get student streak info."""
+    if not is_valid_uuid(student_id):
+        return {
+            "student_id": student_id,
+            "current_streak": 0,
+            "highest_streak": 0,
+            "last_activity_date": None,
+        }
+
     result = await db.execute(
         text("""
             SELECT student_id::text, current_streak, highest_streak,
@@ -91,6 +100,9 @@ async def get_all_achievements(db: AsyncSession) -> list[dict]:
 
 async def get_user_achievements(db: AsyncSession, user_id: str) -> list[dict]:
     """Xem achievements của một user."""
+    if not is_valid_uuid(user_id):
+        return []
+
     result = await db.execute(
         text("""
             SELECT a.achievement_id, a.title, a.description,
@@ -107,6 +119,9 @@ async def get_user_achievements(db: AsyncSession, user_id: str) -> list[dict]:
 
 async def award_achievement(db: AsyncSession, user_id: str, achievement_id: int) -> dict:
     """Trao achievement cho user. Không duplicate (ON CONFLICT DO NOTHING)."""
+    if not is_valid_uuid(user_id):
+        raise ValueError("User không tồn tại")
+
     # Kiểm tra achievement tồn tại
     ach_result = await db.execute(
         text("SELECT title, description FROM achievements WHERE achievement_id = :aid"),
@@ -153,6 +168,15 @@ async def create_achievement(db: AsyncSession, title: str, description: str, ico
 
 async def sync_student_streak(db: AsyncSession, student_id: str) -> dict:
     """Đồng bộ streak khi student có hoạt động học. Gọi sau khi update progress."""
+    if not is_valid_uuid(student_id):
+        return {
+            "student_id": student_id,
+            "current_streak": 0,
+            "highest_streak": 0,
+            "last_activity_date": None,
+            "streak_updated": False,
+        }
+
     today = date.today()
 
     result = await db.execute(

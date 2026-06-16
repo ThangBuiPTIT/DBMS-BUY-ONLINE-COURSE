@@ -2,10 +2,14 @@ import json
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import is_valid_uuid
 
 
 async def get_course_content(db: AsyncSession, course_id: str) -> dict:
     """Get full course content tree (modules → lessons → materials)."""
+    if not is_valid_uuid(course_id):
+        raise ValueError("course not found")
+
     # 1. Course info
     result = await db.execute(
         text("""
@@ -440,6 +444,9 @@ async def _reorder_lessons(db: AsyncSession, module_id: str) -> None:
 
 async def get_course_detail(db: AsyncSession, course_id: str) -> dict:
     """Public: chi tiết khóa học + thống kê."""
+    if not is_valid_uuid(course_id):
+        raise ValueError("course not found")
+
     result = await db.execute(
         text("""
             SELECT

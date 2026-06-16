@@ -59,17 +59,17 @@ async def checkout_course(req: CheckoutRequest, db: AsyncSession = Depends(get_d
 
 # ── Phase 2: Public course detail & categories ──
 
+@router.get("/api/courses/categories")
+async def get_course_categories(db: AsyncSession = Depends(get_db)):
+    return await course_builder_service.get_course_categories(db)
+
+
 @router.get("/api/courses/{course_id}")
 async def get_course_detail(course_id: str, db: AsyncSession = Depends(get_db)):
     try:
         return await course_builder_service.get_course_detail(db, course_id)
     except ValueError:
         raise HTTPException(404, "Không tìm thấy khóa học")
-
-
-@router.get("/api/courses/categories")
-async def get_course_categories(db: AsyncSession = Depends(get_db)):
-    return await course_builder_service.get_course_categories(db)
 
 
 # ── Phase 4: Refund & Transactions ──

@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import is_valid_uuid
 
 
 async def get_transactions(
@@ -70,6 +71,15 @@ async def ban_user(db: AsyncSession, user_id: str, reason: str) -> None:
 async def audit_wallet_balance(db: AsyncSession, user_id: str) -> dict:
     """Đối chiếu số dư ví với transaction logs để phát hiện gian lận.
     Gọi fn_get_user_real_balance()."""
+    if not is_valid_uuid(user_id):
+        return {
+            "user_id": user_id,
+            "wallet_balance": 0.0,
+            "computed_balance": 0.0,
+            "discrepancy": 0.0,
+            "is_consistent": True,
+        }
+
     wallet_result = await db.execute(
         text("SELECT balance FROM wallets WHERE user_id = :uid"),
         {"uid": user_id},
@@ -96,6 +106,9 @@ async def audit_wallet_balance(db: AsyncSession, user_id: str) -> dict:
 
 async def get_course_completion_rate(db: AsyncSession, course_id: str) -> dict:
     """Tỷ lệ hoàn thành khóa học. Gọi fn_get_course_completion_rate()."""
+    if not is_valid_uuid(course_id):
+        raise ValueError("Khóa học không tồn tại")
+
     result = await db.execute(
         text("""
             SELECT

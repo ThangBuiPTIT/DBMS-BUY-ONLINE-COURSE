@@ -1,9 +1,13 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import is_valid_uuid
 
 
 async def get_lesson_comments(db: AsyncSession, lesson_id: str) -> dict:
     """Lấy tất cả comment của một bài học, kèm thông tin user."""
+    if not is_valid_uuid(lesson_id):
+        return {"comments": [], "total": 0}
+
     count_result = await db.execute(
         text("SELECT COUNT(*) FROM comments WHERE lesson_id = :lid"),
         {"lid": lesson_id},
@@ -34,6 +38,9 @@ async def get_lesson_comments(db: AsyncSession, lesson_id: str) -> dict:
 
 async def create_comment(db: AsyncSession, lesson_id: str, user_id: str, content: str) -> dict:
     """Đăng comment mới."""
+    if not is_valid_uuid(lesson_id) or not is_valid_uuid(user_id):
+        raise ValueError("ID không hợp lệ")
+
     result = await db.execute(
         text("""
             INSERT INTO comments (lesson_id, user_id, content)

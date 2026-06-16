@@ -11,6 +11,7 @@ import asyncio
 import asyncpg
 
 from app.core.config import settings
+from app.core.security import hash_password
 
 
 DELETE_ORDER = [
@@ -39,17 +40,18 @@ async def seed(conn: asyncpg.Connection, minimal: bool = False):
 
     # --- 1. Roles ---
     await conn.execute(
-        "INSERT INTO roles (role_name) VALUES ('STUDENT') ON CONFLICT (role_name) DO NOTHING"
+        "INSERT INTO roles (role_name) VALUES ('ADMIN') ON CONFLICT (role_name) DO NOTHING"
     )
     await conn.execute(
         "INSERT INTO roles (role_name) VALUES ('TEACHER') ON CONFLICT (role_name) DO NOTHING"
     )
     await conn.execute(
-        "INSERT INTO roles (role_name) VALUES ('ADMIN') ON CONFLICT (role_name) DO NOTHING"
+        "INSERT INTO roles (role_name) VALUES ('STUDENT') ON CONFLICT (role_name) DO NOTHING"
     )
 
     student_role = await conn.fetchval("SELECT role_id FROM roles WHERE role_name = 'STUDENT'")
     teacher_role = await conn.fetchval("SELECT role_id FROM roles WHERE role_name = 'TEACHER'")
+    admin_role = await conn.fetchval("SELECT role_id FROM roles WHERE role_name = 'ADMIN'")
 
     # --- 2. Users ---
     student_id = await conn.fetchval(
@@ -68,6 +70,15 @@ async def seed(conn: asyncpg.Connection, minimal: bool = False):
         teacher_role,
     )
 
+    admin_id = await conn.fetchval(
+        """INSERT INTO users (username, password_hash, email, role_id, status)
+           VALUES ('admin', $1, 'admin@elearning.com', $2, 'active')
+           ON CONFLICT (username) DO UPDATE SET user_id = users.user_id
+           RETURNING user_id""",
+        hash_password("admin123"),
+        admin_role,
+    )
+
     # --- 3. Profiles ---
     await conn.execute(
         """INSERT INTO user_profiles (user_id, full_name, date_of_birth, phone_number)
@@ -80,6 +91,12 @@ async def seed(conn: asyncpg.Connection, minimal: bool = False):
            VALUES ($1, 'Tran Thi B', '1985-05-12', '0987654321')
            ON CONFLICT (user_id) DO NOTHING""",
         teacher_id,
+    )
+    await conn.execute(
+        """INSERT INTO user_profiles (user_id, full_name, date_of_birth, phone_number)
+           VALUES ($1, 'System Admin', '1990-01-01', '0999999999')
+           ON CONFLICT (user_id) DO NOTHING""",
+        admin_id,
     )
 
     # --- 4. Student & Teacher child records ---
@@ -112,9 +129,13 @@ async def seed(conn: asyncpg.Connection, minimal: bool = False):
     category_id = await conn.fetchval(
         """INSERT INTO general_course_categories (name)
            VALUES ('Ngon ngu ky hieu')
-           ON CONFLICT (name) DO UPDATE SET category_id = general_course_categories.category_id
+           ON CONFLICT (name) DO NOTHING
            RETURNING category_id"""
     )
+    if category_id is None:
+        category_id = await conn.fetchval(
+            "SELECT category_id FROM general_course_categories WHERE name = 'Ngon ngu ky hieu'"
+        )
 
     # --- 7. Courses ---
     course1_id = await conn.fetchval(
@@ -365,20 +386,9 @@ async def main():
 
     try:
         if args.reset:
-            for table in DELETE_ORDER:
-                await conn.execute(f"DELETE FROM {table}")
-            # Also clean users/roles
-            await conn.execute("DELETE FROM notification_users")
+            # Cascade truncate roles and other identity tables to reset all tables and sequences
+            await conn.execute("TRUNCATE TABLE roles, general_course_categories, dictionary_categories, microlearning_topics, achievements RESTART IDENTITY CASCADE")
             await conn.execute("DELETE FROM audit_logs")
-            await conn.execute("DELETE FROM authentication_sessions")
-            await conn.execute("DELETE FROM user_achievements")
-            await conn.execute("DELETE FROM wallets")
-            await conn.execute("DELETE FROM student_streaks")
-            await conn.execute("DELETE FROM teachers")
-            await conn.execute("DELETE FROM students")
-            await conn.execute("DELETE FROM user_profiles")
-            await conn.execute("DELETE FROM users")
-            await conn.execute("DELETE FROM roles")
             print("All data reset.")
 
         await seed(conn, minimal=args.minimal)

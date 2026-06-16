@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import is_valid_uuid
 
 
 async def submit_feedback(
@@ -8,6 +9,9 @@ async def submit_feedback(
     """Gửi đánh giá khóa học. DB trigger trg_prevent_feedback_without_learning
     sẽ từ chối nếu student chưa học (progress < 10%).
     Context lưu dạng 'course:<course_id>:<course_title>' để dễ tra cứu."""
+
+    if not is_valid_uuid(user_id) or not is_valid_uuid(course_id):
+        raise ValueError("Khóa học không tồn tại")
 
     # Lấy course title để lưu vào context
     result = await db.execute(
@@ -55,6 +59,13 @@ async def submit_feedback(
 
 async def get_course_feedback(db: AsyncSession, course_id: str) -> dict:
     """Lấy danh sách đánh giá của khóa học."""
+    if not is_valid_uuid(course_id):
+        return {
+            "feedbacks": [],
+            "total": 0,
+            "average_rating": 0.0,
+        }
+
     result = await db.execute(
         text("""
             SELECT
