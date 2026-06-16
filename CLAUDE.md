@@ -11,6 +11,31 @@
 
 ---
 
+## Current Status & Implementation Plan
+
+**Phase 0 (COMPLETE):** 30/30 Go API endpoints migrated to FastAPI. All 27 ORM models created. All 8 DB views wired. Basic CRUD for courses (modules, lessons, reorder, visibility).
+
+**Gap Analysis Identified:** The codebase has significant gaps — 3 of 4 DB functions unused, 2 of 5 stored procedures uncalled, ~84 CRUD operations missing, no advanced indexing, no Redis cache, and several DB triggers need creation. See `docs/Ke_hoach_hoan_thien_codebase.md` for the full analysis.
+
+**Active Implementation Plan:** `docs/Ke_hoach_hoan_thien_codebase.md` — 5-phase plan to close all gaps. Step-by-step execution guides at `docs/Phase_1_Step_by_Step.md` through `docs/Phase_5_Step_by_Step.md`.
+
+| Phase | Focus | Endpoints | Status |
+|-------|-------|-----------|--------|
+| 1 | User & Profile CRUD | 8 new | ✅ Complete |
+| 2 | Course Content CRUD & Progress | 12 new | ⬜ Pending |
+| 3 | Comments, Feedback & Achievements | 11 new | ⬜ Pending |
+| 4 | E-Commerce & Auditing | 5 new | ⬜ Pending |
+| 5 | Advanced DBMS Optimizations | Migrations + Redis | ⬜ Pending |
+
+**Key Implementation Rules:**
+- Each phase gets its own git branch (`phase/N-short-name`) merged to `fastapi`
+- All tests must pass before merge
+- Never change existing DB schema — only add indexes, triggers, materialized views
+- All new code follows existing conventions: `snake_case` files/functions, `PascalCase` classes
+- All DB procedures/functions defined in `backend/app/db/procedures.sql` MUST be called by the service layer
+
+---
+
 ## Tech Stack (Target on fastapi branch)
 
 | Layer | Technology | Notes |
@@ -45,11 +70,27 @@ The database has **27 tables** across two categories:
 - `audit_logs` — audit trail
 - `notification_users` — user notifications
 
-### Key DB Objects (from procedure_trigger_transaction.sql)
-- **8 Views:** `vw_student_progress_report`, `vw_course_analytics`, `vw_top_learners_leaderboard`, `vw_revenue_by_course`, `vw_teacher_dashboard`, `vw_inactive_students`, `vw_course_feedback_summary`, `vw_detailed_transaction_history`
-- **4 Functions:** `fn_search_students`, `fn_check_certificate_eligibility`, `fn_get_user_real_balance`, `fn_get_course_completion_rate`
-- **5 Procedures:** `sp_update_course_progress`, `sp_topup_wallet`, `sp_buy_course_with_wallet` (core e-commerce), `sp_refund_course`, `sp_ban_user`
-- **4 Triggers:** prevent feedback without learning, block negative wallet balance, auto-archive courses of frozen teachers, alert large transactions
+### Key DB Objects — USAGE STATUS
+
+| Object | Type | Used in Code? | Service/API |
+|--------|------|--------------|-------------|
+| `vw_student_progress_report` | View | ✅ | `services/student.py` |
+| `vw_course_analytics` | View | ✅ | `services/teacher.py` |
+| `vw_top_learners_leaderboard` | View | ✅ | `services/gamification.py` |
+| `vw_revenue_by_course` | View | ✅ | `services/admin.py` |
+| `vw_teacher_dashboard` | View | ✅ | `services/teacher.py` |
+| `vw_inactive_students` | View | ✅ | `services/student.py` |
+| `vw_course_feedback_summary` | View | ✅ | `services/teacher.py` |
+| `vw_detailed_transaction_history` | View | ✅ | `services/admin.py` |
+| `fn_search_students` | Function | ✅ | `services/student.py` |
+| `fn_check_certificate_eligibility` | Function | ❌ NOT USED | Phase 4 |
+| `fn_get_user_real_balance` | Function | ❌ NOT USED | Phase 4 |
+| `fn_get_course_completion_rate` | Function | ❌ NOT USED | Phase 4 |
+| `sp_update_course_progress` | Procedure | ❌ NOT USED | Phase 2 |
+| `sp_topup_wallet` | Procedure | ✅ | `services/store.py` |
+| `sp_buy_course_with_wallet` | Procedure | ✅ | `services/store.py` |
+| `sp_refund_course` | Procedure | ❌ NOT USED | Phase 4 |
+| `sp_ban_user` | Procedure | ✅ | `services/admin.py` |
 
 ---
 
@@ -98,9 +139,9 @@ backend/
 
 ---
 
-## Target FastAPI Architecture (TO BE BUILT)
+## Target FastAPI Architecture
 
-We will follow FastAPI best practices with a layered architecture:
+We follow FastAPI best practices with a layered architecture:
 
 ```
 backend/
@@ -112,23 +153,26 @@ backend/
 │   │   ├── config.py            # Pydantic Settings (DB URL, Redis URL, etc.)
 │   │   ├── database.py          # Async SQLAlchemy engine + session factory
 │   │   ├── security.py          # Password hashing, JWT/session creation
-│   │   └── deps.py              # Dependency injection (get_db, get_current_user)
+│   │   ├── deps.py              # Dependency injection (get_db, get_current_user, get_current_admin)
+│   │   └── cache.py             # Redis cache (Phase 5)
 │   ├── models/                  # SQLAlchemy ORM models (declarative_base)
 │   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── course.py
-│   │   ├── store.py
-│   │   ├── dictionary.py
-│   │   ├── microlearning.py
-│   │   ├── gamification.py
-│   │   └── notification.py
+│   │   ├── user.py              # Role, User, UserProfile, Student, Teacher, AuthenticationSession
+│   │   ├── course.py            # GeneralCourseCategory, GeneralCourse, Module, Lesson, Material, Enrollment, Comment
+│   │   ├── store.py             # Wallet, TransactionLog, TransactionActionLog
+│   │   ├── dictionary.py        # DictionaryCategory, DictionaryEntry, DictionaryVariation
+│   │   ├── microlearning.py     # MicrolearningTopic, Unit, Lesson, LessonPart, Question
+│   │   ├── gamification.py      # StudentStreak, Achievement, UserAchievement, UserFeedback
+│   │   └── notification.py      # Log, AuditLog, NotificationUser
 │   ├── schemas/                 # Pydantic request/response schemas
 │   │   ├── __init__.py
 │   │   ├── auth.py
+│   │   ├── user.py              # (Phase 1)
 │   │   ├── admin.py
 │   │   ├── teacher.py
 │   │   ├── student.py
 │   │   ├── store.py
+│   │   ├── course.py            # (Phase 3)
 │   │   ├── gamification.py
 │   │   ├── dictionary.py
 │   │   ├── microlearning.py
@@ -138,10 +182,14 @@ backend/
 │   │   ├── __init__.py
 │   │   ├── router.py            # Main APIRouter aggregation
 │   │   ├── auth.py
+│   │   ├── user.py              # (Phase 1)
 │   │   ├── admin.py
 │   │   ├── teacher.py
 │   │   ├── student.py
 │   │   ├── store.py
+│   │   ├── comment.py           # (Phase 3)
+│   │   ├── feedback.py          # (Phase 3)
+│   │   ├── certificate.py       # (Phase 4)
 │   │   ├── gamification.py
 │   │   ├── dictionary.py
 │   │   ├── microlearning.py
@@ -150,33 +198,48 @@ backend/
 │   ├── services/                # Business logic
 │   │   ├── __init__.py
 │   │   ├── auth.py
+│   │   ├── user.py              # (Phase 1)
 │   │   ├── admin.py
 │   │   ├── teacher.py
 │   │   ├── student.py
 │   │   ├── store.py
+│   │   ├── comment.py           # (Phase 3)
+│   │   ├── feedback.py          # (Phase 3)
+│   │   ├── certificate.py       # (Phase 4)
 │   │   ├── gamification.py
 │   │   ├── dictionary.py
 │   │   ├── microlearning.py
 │   │   ├── course_builder.py
 │   │   └── notification.py
 │   └── db/                      # Database scripts
-│       ├── erd.sql              # (copy of ERD.sql)
-│       ├── procedures.sql       # (copy of procedure_trigger_transaction.sql)
-│       └── seed.py              # (refactored seed_data.py)
+│       ├── erd.sql
+│       ├── procedures.sql
+│       └── seed.py
 ├── alembic/                     # Alembic migrations
 │   ├── env.py
 │   └── versions/
 ├── tests/
 │   ├── conftest.py
 │   ├── test_auth.py
-│   ├── test_admin.py
-│   ├── ...
+│   ├── test_user_crud.py        # (Phase 1)
+│   ├── test_course_crud.py      # (Phase 2)
+│   ├── test_progress.py         # (Phase 2)
+│   ├── test_comments.py         # (Phase 3)
+│   ├── test_feedback.py         # (Phase 3)
+│   ├── test_achievements.py     # (Phase 3)
+│   ├── test_store.py            # (Phase 4)
+│   ├── test_admin_audit.py      # (Phase 4)
+│   ├── test_certificate.py      # (Phase 4)
+│   ├── test_cache.py            # (Phase 5)
+│   └── test_leaderboard_mv.py   # (Phase 5)
 ├── requirements.txt
 ├── pyproject.toml
 └── .env.example
 ```
 
-### Key Design Decisions
+---
+
+## Key Design Decisions
 1. **Async-first** — use `asyncpg` driver + `sqlalchemy.ext.asyncio` for non-blocking DB access
 2. **Pydantic v2** for all request/response validation
 3. **Dependency injection** via FastAPI's `Depends()` — replaces manual struct wiring in Go's `main.go`
@@ -187,7 +250,9 @@ backend/
 
 ---
 
-## API Endpoints Summary (from main branch — all to be replicated)
+## API Endpoints Summary
+
+### Existing (30 endpoints — all implemented)
 
 | # | Method | Route | Handler |
 |---|--------|-------|---------|
@@ -222,6 +287,10 @@ backend/
 | 29 | PUT | `/api/notifications/{notification_id}/read` | Notification |
 | 30 | GET | `/api/admin/audit-logs` | Notification |
 
+### Planned (36 new endpoints — see phase guides)
+
+See individual phase docs in `docs/Phase_N_Step_by_Step.md` for the new endpoint tables.
+
 ---
 
 ## Conventions for FastAPI Code
@@ -230,7 +299,7 @@ backend/
 - **File names:** snake_case (e.g., `course_builder.py`)
 - **Route functions:** snake_case (e.g., `get_course_content`)
 - **SQLAlchemy models:** PascalCase singular (e.g., `GeneralCourse`)
-- **Pydantic schemas:** PascalCase with suffixes (`CourseCreate`, `CourseResponse`, `CourseList`)
+- **Pydantic schemas:** PascalCase with suffixes (`CourseCreateRequest`, `CourseDetailResponse`)
 - **Tables in DB:** snake_case plural (unchanged from ERD)
 
 ### Route Organization
@@ -255,8 +324,6 @@ backend/
 
 ## Files to Keep / Copy from main
 
-These files are database-level and should be copied as-is (or refactored slightly):
-
 | File | Destination | Notes |
 |------|-------------|-------|
 | `ERD.sql` | `backend/app/db/erd.sql` | Copy verbatim |
@@ -278,8 +345,13 @@ These files are database-level and should be copied as-is (or refactored slightl
 
 ## Related Documents
 
-- `TRANSFORMATION_PLAN.md` — Step-by-step migration plan
-- `API_ENDPOINT_MAPPING.md` — Detailed Go → FastAPI endpoint mappings
-- `PROJECT_STRUCTURE.md` — FastAPI directory layout with file roles
+- `docs/Ke_hoach_hoan_thien_codebase.md` — **Master implementation plan (5 phases)**
+- `docs/Phase_1_Step_by_Step.md` — User & Profile CRUD execution
+- `docs/Phase_2_Step_by_Step.md` — Course Content & Progress execution
+- `docs/Phase_3_Step_by_Step.md` — Comments, Feedback & Achievements execution
+- `docs/Phase_4_Step_by_Step.md` — E-Commerce & Auditing execution
+- `docs/Phase_5_Step_by_Step.md` — Advanced DBMS execution
+- `docs/API_ENDPOINT_MAPPING.md` — Detailed Go → FastAPI endpoint mappings
+- `docs/TRANSFORMATION_PLAN.md` — Step-by-step migration plan
 - `ERD.sql` — Full database schema
 - `Ke_hoach_ap_dung_HQTCSDL_Elearning.md` — Database techniques reference (Vietnamese)
