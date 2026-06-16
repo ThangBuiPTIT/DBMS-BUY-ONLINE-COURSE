@@ -11,6 +11,7 @@ from app.api import (
     store,
     student,
     teacher,
+    user,
 )
 
 api_router = APIRouter()
@@ -25,3 +26,4 @@ api_router.include_router(dictionary.router)
 api_router.include_router(microlearning.router)
 api_router.include_router(course_builder.router)
 api_router.include_router(notification.router)
+api_router.include_router(user.router)
