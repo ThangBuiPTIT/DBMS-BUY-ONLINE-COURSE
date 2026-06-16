@@ -1,0 +1,284 @@
+@import "tailwindcss";
+
+/* ============================================
+   TAILWIND V4 THEME — Modern Education
+   (White + Blue / Light Mode)
+   ============================================ */
+@theme {
+  /* --- Brand Colors --- */
+  --color-primary:       #2563eb; /* blue.600 */
+  --color-primary-hover: #1d4ed8; /* blue.700 */
+  --color-primary-light: #eff6ff; /* blue.50  */
+
+  /* --- Background Colors --- */
+  --color-base:    #f8fafc; /* slate.50  */
+  --color-surface: #ffffff; /* white     */
+
+  /* --- Text Colors --- */
+  --color-heading: #0f172a; /* slate.900 */
+  --color-body:    #475569; /* slate.600 */
+  --color-muted:   #94a3b8; /* slate.400 */
+
+  /* --- Border Colors --- */
+  --color-divider: #e2e8f0; /* slate.200 */
+}
+
+/* ============================================
+   GLOBAL BASE STYLES
+   ============================================ */
+@layer base {
+  html {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-base text-body;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-heading font-bold;
+  }
+
+  ::selection {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-base);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-divider);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1; /* slate.300 */
+  }
+}
+
+/* ============================================
+   COMPONENT UTILITY CLASSES
+   ============================================ */
+@layer utilities {
+  /* --- Button --- */
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover text-white font-semibold
+           rounded-lg px-5 py-2.5 transition-colors duration-200
+           focus:outline-none focus:ring-2 focus:ring-primary/40
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply border border-divider hover:border-primary hover:text-primary
+           text-body font-semibold rounded-lg px-5 py-2.5
+           transition-colors duration-200 bg-surface;
+  }
+
+  .btn-ghost {
+    @apply text-primary hover:bg-primary-light font-semibold rounded-lg
+           px-5 py-2.5 transition-colors duration-200;
+  }
+
+  /* --- Card --- */
+  .card {
+    @apply bg-surface border border-divider rounded-2xl shadow-sm
+           hover:shadow-md transition-shadow duration-200;
+  }
+
+  /* --- Input --- */
+  .input-field {
+    @apply bg-surface border border-divider rounded-lg px-4 py-2.5 w-full
+           text-heading placeholder:text-muted
+           focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20
+           transition-all duration-200 text-sm;
+  }
+
+  /* --- Badge --- */
+  .badge-primary {
+    @apply bg-primary-light text-primary font-semibold text-xs
+           px-2.5 py-1 rounded-full;
+  }
+
+  /* --- Section Heading --- */
+  .section-title {
+    @apply text-heading font-bold text-2xl tracking-tight;
+  }
+
+  /* --- Divider line --- */
+  .divider {
+    @apply border-t border-divider;
+  }
+
+  /* --- Progress bar base --- */
+  .progress-bar {
+    @apply h-2 rounded-full bg-divider overflow-hidden;
+  }
+  .progress-bar-fill {
+    @apply h-full rounded-full bg-primary transition-all duration-500;
+  }
+}
+
+/* ============================================
+   DARK → LIGHT GLOBAL OVERRIDE
+   Chuyển đổi toàn bộ giao diện dark sang
+   nền trắng + chữ xanh (Modern Education)
+   ============================================ */
+
+/* --- Nền toàn trang --- */
+.bg-slate-950,
+.bg-slate-900,
+.bg-slate-800,
+.bg-slate-900\/60,
+.bg-slate-900\/80,
+.bg-slate-950\/80,
+.bg-slate-950\/40,
+.bg-slate-950\/60,
+.bg-slate-800\/40,
+.bg-slate-800\/50,
+.bg-slate-800\/10,
+.bg-slate-850 {
+  background-color: #ffffff !important;
+}
+
+/* Main body wrapper */
+.min-h-screen.bg-slate-950,
+.min-h-screen.bg-slate-900 {
+  background-color: #f8fafc !important;
+}
+
+/* --- Sidebar --- */
+aside.w-72,
+aside.w-64 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 2px 0 8px 0 rgba(37,99,235,0.06) !important;
+}
+
+/* --- Header / Topbar --- */
+header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  backdrop-filter: none !important;
+}
+
+/* --- Text overrides --- */
+.text-slate-100,
+.text-slate-200,
+.text-white {
+  color: #0f172a !important;
+}
+
+.text-slate-300,
+.text-slate-400 {
+  color: #475569 !important;
+}
+
+.text-slate-500,
+.text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+/* Keep blue/primary text */
+.text-indigo-400,
+.text-indigo-300,
+.text-violet-400 {
+  color: #2563eb !important;
+}
+
+/* --- Border overrides --- */
+.border-slate-800,
+.border-slate-700,
+.border-slate-800\/50,
+.border-slate-850,
+.border-slate-700\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+/* --- Active sidebar nav item --- */
+.bg-indigo-500\/15,
+.bg-gradient-to-r.from-violet-600\/15 {
+  background-color: #eff6ff !important;
+}
+
+/* --- Card & Panel backgrounds --- */
+.bg-slate-900\/40,
+.bg-slate-900\/60,
+.bg-slate-900\/90,
+.bg-slate-900\/95,
+.bg-slate-800\/80,
+.backdrop-blur-xl,
+.backdrop-blur-md {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+}
+
+/* --- Input fields --- */
+.bg-slate-900\/60,
+.bg-slate-950\/40,
+.bg-slate-900 input,
+input.bg-slate-900\/60 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* --- Table rows --- */
+tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+.divide-slate-800\/50 > * + * {
+  border-color: #e2e8f0 !important;
+}
+.divide-slate-800 > * + * {
+  border-color: #e2e8f0 !important;
+}
+.divide-y {
+  --tw-divide-opacity: 1;
+}
+
+/* --- Sidebar footer user card --- */
+.bg-slate-950\/40 {
+  background-color: #f8fafc !important;
+}
+
+/* --- Indigo/violet badges & icons keep blue --- */
+.bg-indigo-500\/10,
+.bg-indigo-600\/20,
+.bg-violet-600\/20 {
+  background-color: #eff6ff !important;
+}
+.border-indigo-500\/20,
+.border-indigo-500\/30 {
+  border-color: #bfdbfe !important;
+}
+
+/* --- Logout button stays red --- */
+.bg-red-500\/10 { background-color: #fff1f2 !important; }
+.border-red-500\/20 { border-color: #fecaca !important; }
+.text-red-400 { color: #ef4444 !important; }
+
+/* --- Metric cards shadow lift --- */
+.shadow-xl, .shadow-2xl, .shadow-lg {
+  box-shadow: 0 1px 8px 0 rgba(37,99,235,0.08), 0 0 0 1px #e2e8f0 !important;
+}
+
+/* --- Gradient text on sidebar brand → blue --- */
+.bg-gradient-to-r.from-indigo-400,
+.bg-gradient-to-r.from-white {
+  background-image: linear-gradient(to right, #2563eb, #1d4ed8) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+/* --- Scrollbar light mode --- */
+* {
+  scrollbar-color: #e2e8f0 #f8fafc;
+}
