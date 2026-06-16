@@ -24,8 +24,8 @@
 | 1 | User & Profile CRUD | 8 new | ✅ Complete |
 | 2 | Course Content CRUD & Progress | 13 new | ✅ Complete |
 | 3 | Comments, Feedback & Achievements | 11 new | ✅ Complete |
-| 4 | E-Commerce & Auditing | 5 new | ⬜ Pending |
-| 5 | Advanced DBMS Optimizations | Migrations + Redis | ⬜ Pending |
+| 4 | E-Commerce & Auditing | 5 new | ✅ Complete |
+| 5 | Advanced DBMS Optimizations | Migrations + Redis | ✅ Complete |
 
 **Key Implementation Rules:**
 - Each phase gets its own git branch (`phase/N-short-name`) merged to `fastapi`
