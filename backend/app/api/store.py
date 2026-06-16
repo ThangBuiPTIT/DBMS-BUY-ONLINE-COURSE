@@ -8,6 +8,7 @@ from app.schemas.store import (
     TopupRequest,
     WalletInfoResponse,
 )
+from app.services import course_builder as course_builder_service
 from app.services import store as store_service
 from app.services.store import StoreError
 
@@ -51,3 +52,18 @@ async def checkout_course(req: CheckoutRequest, db: AsyncSession = Depends(get_d
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"status": "SUCCESS", "message": "Mua khóa học thành công"}
+
+
+# ── Phase 2: Public course detail & categories ──
+
+@router.get("/api/courses/{course_id}")
+async def get_course_detail(course_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        return await course_builder_service.get_course_detail(db, course_id)
+    except ValueError:
+        raise HTTPException(404, "Không tìm thấy khóa học")
+
+
+@router.get("/api/courses/categories")
+async def get_course_categories(db: AsyncSession = Depends(get_db)):
+    return await course_builder_service.get_course_categories(db)
