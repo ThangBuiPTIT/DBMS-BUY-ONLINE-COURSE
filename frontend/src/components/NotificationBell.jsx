@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { api } from '../api/client';
 import { Bell, Check, Clock, MailOpen } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export default function NotificationBell({ userId }) {
   const [notifications, setNotifications] = useState([]);
@@ -27,7 +25,7 @@ export default function NotificationBell({ userId }) {
 
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/notifications/${userId}`);
+      const response = await api.get(`/api/notifications/${userId}`);
       setNotifications(response.data || []);
     } catch (error) {
       console.error('Lỗi khi tải thông báo:', error);
@@ -36,9 +34,8 @@ export default function NotificationBell({ userId }) {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await axios.put(`${API_URL}/api/notifications/${notificationId}/read`);
-      // Update local state directly
-      setNotifications(prev => 
+      await api.put(`/api/notifications/${notificationId}/read`);
+      setNotifications(prev =>
         prev.map(n => n.notification_id === notificationId ? { ...n, is_read: true } : n)
       );
     } catch (error) {
@@ -49,7 +46,7 @@ export default function NotificationBell({ userId }) {
   const handleMarkAllAsRead = async () => {
     const unread = notifications.filter(n => !n.is_read);
     try {
-      await Promise.all(unread.map(n => axios.put(`${API_URL}/api/notifications/${n.notification_id}/read`)));
+      await Promise.all(unread.map(n => api.put(`/api/notifications/${n.notification_id}/read`)));
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch (error) {
       console.error('Lỗi khi đánh dấu tất cả đã đọc:', error);
@@ -66,28 +63,25 @@ export default function NotificationBell({ userId }) {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 bg-slate-800/80 hover:bg-slate-750 text-slate-300 hover:text-white rounded-xl border border-slate-700/60 transition-all duration-200 cursor-pointer flex items-center justify-center focus:outline-none"
+        className="relative p-2.5 bg-surface hover:bg-gray-50 text-body hover:text-heading rounded-xl border border-divider transition-colors flex items-center justify-center focus:outline-none"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-extrabold text-white border-2 border-slate-950 animate-bounce">
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-extrabold text-white border-2 border-surface">
             {unreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fadeIn">
-          {/* Header */}
-          <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+        <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-surface border border-divider rounded-2xl shadow-lg z-50 overflow-hidden">
+          <div className="p-4 border-b border-divider flex items-center justify-between bg-base">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-slate-200">Thông báo</span>
+              <span className="text-sm font-bold text-heading">Thông báo</span>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-extrabold border border-indigo-500/20">
+                <span className="px-2 py-0.5 rounded-full bg-primary-light text-primary text-[10px] font-extrabold border border-blue-200">
                   {unreadCount} mới
                 </span>
               )}
@@ -95,7 +89,7 @@ export default function NotificationBell({ userId }) {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1"
               >
                 <Check className="w-3.5 h-3.5" />
                 Đọc tất cả
@@ -103,29 +97,28 @@ export default function NotificationBell({ userId }) {
             )}
           </div>
 
-          {/* List */}
-          <div className="max-h-[350px] overflow-y-auto divide-y divide-slate-850 scrollbar-thin">
+          <div className="max-h-[350px] overflow-y-auto divide-y divide-divider">
             {notifications.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">
-                <MailOpen className="w-8 h-8 text-slate-700" />
+              <div className="p-8 text-center text-muted flex flex-col items-center gap-2">
+                <MailOpen className="w-8 h-8 text-muted" />
                 <p className="text-xs font-semibold">Hộp thư thông báo trống</p>
               </div>
             ) : (
               notifications.map((n) => (
                 <div
                   key={n.notification_id}
-                  className={`p-4 transition-colors duration-150 flex items-start gap-3.5 relative ${
-                    n.is_read ? 'hover:bg-slate-850/40' : 'bg-indigo-950/15 hover:bg-indigo-950/25 border-l-4 border-l-indigo-500'
+                  className={`p-4 transition-colors flex items-start gap-3.5 relative ${
+                    n.is_read ? 'hover:bg-gray-50' : 'bg-primary-light/40 hover:bg-primary-light border-l-4 border-l-primary'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold text-slate-200 ${!n.is_read ? 'font-bold' : ''}`}>
+                    <p className={`text-xs font-semibold text-heading ${!n.is_read ? 'font-bold' : ''}`}>
                       {n.title}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed break-words">
+                    <p className="text-[11px] text-body mt-1 leading-relaxed break-words">
                       {n.message}
                     </p>
-                    <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-2">
+                    <div className="flex items-center gap-1 text-[10px] text-muted mt-2">
                       <Clock className="w-3 h-3" />
                       <span>{formatTime(n.created_at)}</span>
                     </div>
@@ -134,7 +127,7 @@ export default function NotificationBell({ userId }) {
                   {!n.is_read && (
                     <button
                       onClick={() => handleMarkAsRead(n.notification_id)}
-                      className="p-1 hover:bg-indigo-500/25 text-indigo-400 hover:text-indigo-300 rounded-lg transition-colors cursor-pointer"
+                      className="p-1 hover:bg-primary text-primary hover:text-white rounded-lg transition-colors"
                       title="Đánh dấu đã đọc"
                     >
                       <Check className="w-4 h-4" />
