@@ -170,7 +170,11 @@ async def create_achievement(db: AsyncSession, title: str, description: str, ico
 # ── Phase 3: Streak Sync ──
 
 async def sync_student_streak(db: AsyncSession, student_id: str) -> dict:
-    """Đồng bộ streak khi student có hoạt động học. Gọi sau khi update progress."""
+    """Đồng bộ streak khi student có hoạt động học.
+    App tính current_streak, DB trigger trg_streak_sync tự động:
+      - Nâng highest_streak khi current_streak vượt qua
+      - Cập nhật last_activity_date
+    """
     if not is_valid_uuid(student_id):
         return {
             "student_id": student_id,
@@ -189,10 +193,10 @@ async def sync_student_streak(db: AsyncSession, student_id: str) -> dict:
     streak = result.mappings().first()
 
     if not streak:
-        # Tạo mới nếu trigger chưa chạy
+        # Tạo mới — trigger trg_streak_sync sẽ set last_activity_date
         await db.execute(
-            text("INSERT INTO student_streaks (student_id, current_streak, highest_streak, last_activity_date) VALUES (:sid, 1, 1, :today) ON CONFLICT (student_id) DO NOTHING"),
-            {"sid": student_id, "today": today},
+            text("INSERT INTO student_streaks (student_id, current_streak, highest_streak) VALUES (:sid, 1, 1) ON CONFLICT (student_id) DO NOTHING"),
+            {"sid": student_id},
         )
         await db.commit()
         return {
@@ -204,40 +208,39 @@ async def sync_student_streak(db: AsyncSession, student_id: str) -> dict:
         }
 
     current = streak["current_streak"]
-    highest = streak["highest_streak"]
     last_date = streak["last_activity_date"]
     updated = False
 
     if last_date is None:
-        # Lần đầu có hoạt động
         current = 1
-        highest = 1
         updated = True
     elif last_date == today:
-        # Đã có hoạt động hôm nay → không đổi
-        pass
+        pass  # Already active today
     elif last_date == today - timedelta(days=1):
-        # Ngày liên tiếp → tăng streak
-        current += 1
-        if current > highest:
-            highest = current
+        current += 1  # Consecutive day
         updated = True
     else:
-        # Đứt streak → reset
-        current = 1
+        current = 1  # Broken streak
         updated = True
 
     if updated:
+        # DB trigger trg_streak_sync auto-raises highest_streak + sets last_activity_date
         await db.execute(
-            text("UPDATE student_streaks SET current_streak = :cur, highest_streak = :high, last_activity_date = :today WHERE student_id = :sid"),
-            {"cur": current, "high": highest, "today": today, "sid": student_id},
+            text("UPDATE student_streaks SET current_streak = :cur WHERE student_id = :sid"),
+            {"cur": current, "sid": student_id},
         )
         await db.commit()
 
+    # Đọc lại giá trị cuối cùng (đã được trigger xử lý)
+    result = await db.execute(
+        text("SELECT current_streak, highest_streak, last_activity_date::text FROM student_streaks WHERE student_id = :sid"),
+        {"sid": student_id},
+    )
+    final = result.mappings().first()
     return {
         "student_id": student_id,
-        "current_streak": current,
-        "highest_streak": highest,
-        "last_activity_date": str(today),
+        "current_streak": final["current_streak"],
+        "highest_streak": final["highest_streak"],
+        "last_activity_date": str(final["last_activity_date"]),
         "streak_updated": updated,
     }

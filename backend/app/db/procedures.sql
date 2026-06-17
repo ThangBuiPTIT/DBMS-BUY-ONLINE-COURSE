@@ -1,4 +1,21 @@
 ﻿-- ====================================================================================
+-- TRIGGER REGISTRY (Đăng ký Trigger)
+-- ====================================================================================
+-- | # | Trigger Name | Table | Event | Function | Purpose |
+-- |---|-------------|-------|-------|----------|---------|
+-- | 1 | trg_auto_updated_at | users, dict_entries, courses, wallets | BEFORE UPDATE | fn_auto_update_timestamp | Auto-set updated_at |
+-- | 2 | trg_provision_user | users | AFTER INSERT | fn_provision_new_user | Auto-create wallet (+ streak for students) |
+-- | 3 | trg_create_student_streak | students | AFTER INSERT | fn_create_student_streak | Defense-in-depth: ensure streak row exists |
+-- | 4 | trg_streak_sync | student_streaks | BEFORE INSERT/UPDATE | fn_sync_highest_streak | Auto-raise highest_streak |
+-- | 5 | trg_prevent_feedback_without_learning | user_feedbacks | BEFORE INSERT | fn_prevent_feedback_without_learning | Block reviews without progress |
+-- | 6 | trg_check_sufficient_balance | wallets | BEFORE UPDATE OF balance | fn_check_sufficient_balance | Prevent negative balance |
+-- | 7 | trg_audit_wallet | wallets | AFTER UPDATE OF balance | fn_audit_wallet_change | Log every balance change |
+-- | 8 | trg_auto_hide_teacher_courses | users | AFTER UPDATE OF status | fn_auto_hide_teacher_courses | Archive courses when teacher banned |
+-- | 9 | trg_alert_large_transaction | transaction_logs | AFTER INSERT | fn_alert_large_transaction | Notify admin of large tx |
+-- |10 | trg_prevent_self_transfer | transaction_logs | BEFORE INSERT | fn_prevent_self_transfer | Block self-transfers |
+-- ====================================================================================
+
+-- ====================================================================================
 -- PHẦN 0: CẬP NHẬT CẤU TRÚC BẢNG (Hỗ trợ E-Commerce)
 -- ====================================================================================
 -- Tác dụng: Thêm giá tiền cho khóa học và liên kết giao dịch với khóa học để dễ thống kê.
@@ -380,3 +397,25 @@ BEGIN
     END IF;
 END $$;
 */
+
+
+-- ====================================================================================
+-- 4.5 Chặn tự chuyển tiền cho chính mình (Self-Transfer Prevention)
+-- Tác dụng: Bảo vệ ở mức DB — không cho phép from = to trong transaction_logs.
+--           Bổ sung cho validation trong sp_transfer_funds.
+-- ====================================================================================
+CREATE OR REPLACE FUNCTION fn_prevent_self_transfer()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.from_wallet_user_id IS NOT NULL
+       AND NEW.from_wallet_user_id = NEW.to_wallet_user_id THEN
+        RAISE EXCEPTION 'Không thể tự chuyển tiền cho chính mình (self-transfer)';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevent_self_transfer ON transaction_logs;
+CREATE TRIGGER trg_prevent_self_transfer
+BEFORE INSERT ON transaction_logs
+FOR EACH ROW EXECUTE FUNCTION fn_prevent_self_transfer();
