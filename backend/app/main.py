@@ -5,10 +5,33 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.router import api_router
 from app.core.cache import cache
 from app.core.config import settings
-from app.core.database import async_session, engine
+from app.core.database import async_session, engine, get_db
+
+
+async def _prewarm_hot_tables():
+    """Nạp các bảng nóng vào buffer pool sau khi DB restart."""
+    hot_tables = [
+        "dictionary_entries", "dictionary_categories", "dictionary_variations",
+        "general_courses", "general_course_categories", "mv_leaderboard",
+        "user_profiles", "roles",
+    ]
+    try:
+        async with engine.connect() as conn:
+            for tbl in hot_tables:
+                try:
+                    await conn.execute(text(f"SELECT pg_prewarm('{tbl}')"))
+                except Exception:
+                    pass
+            await conn.commit()
+        print("[Prewarm] Hot tables loaded into buffer cache")
+    except Exception as e:
+        print(f"[Prewarm] Failed: {e}")
 
 
 async def _refresh_leaderboard_periodically():
@@ -39,6 +62,9 @@ async def lifespan(app: FastAPI):
     if settings.REDIS_ENABLED:
         await cache.connect()
         print("Redis connected")
+
+    # Prewarm hot tables into PostgreSQL buffer cache
+    await _prewarm_hot_tables()
 
     # Start periodic leaderboard refresh
     refresh_task = asyncio.create_task(_refresh_leaderboard_periodically())
@@ -88,3 +114,21 @@ app.include_router(api_router)
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "message": "FastAPI E-Learning API is running"}
+
+
+@app.get("/api/health/cache")
+async def cache_health(db: AsyncSession = Depends(get_db)):
+    """Health check with buffer cache statistics."""
+    from app.core.buffer_monitor import get_cache_hit_ratio
+    ratio = await get_cache_hit_ratio(db)
+    redis_status = "connected" if cache.enabled else "disabled"
+    return {
+        "postgresql": {
+            "cache_hit_ratio_pct": ratio["hit_ratio_pct"],
+            "disk_reads": ratio["disk_reads"],
+            "cache_hits": ratio["cache_hits"],
+            "status": "healthy" if ratio["hit_ratio_pct"] >= 95 else "degraded",
+        },
+        "redis": redis_status,
+        "redis_stats": cache.stats(),
+    }

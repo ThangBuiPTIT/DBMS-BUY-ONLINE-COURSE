@@ -13,6 +13,19 @@ class RedisCache:
     def __init__(self):
         self._redis = None
         self._enabled = settings.REDIS_ENABLED
+        self._hits = 0
+        self._misses = 0
+
+    def stats(self) -> dict:
+        total = self._hits + self._misses
+        return {
+            "hits": self._hits, "misses": self._misses,
+            "hit_rate_pct": round(self._hits / total * 100, 2) if total > 0 else 0.0,
+            "total_requests": total, "enabled": self._enabled,
+        }
+
+    def _record_hit(self): self._hits += 1
+    def _record_miss(self): self._misses += 1
 
     async def connect(self) -> None:
         if not self._enabled:

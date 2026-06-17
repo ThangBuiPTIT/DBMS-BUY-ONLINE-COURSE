@@ -166,6 +166,10 @@ async def toggle_course_visibility(db: AsyncSession, course_id: str, status: str
         {"st": status, "cid": course_id},
     )
     await db.commit()
+    # Invalidate course catalog cache
+    from app.core.cache_invalidation import invalidate_course_catalog, invalidate_course_detail
+    await invalidate_course_catalog()
+    await invalidate_course_detail(course_id)
 
 
 # ── Phase 2: Course CRUD ──
