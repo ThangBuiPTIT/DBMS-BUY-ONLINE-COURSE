@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     SESSION_CACHE_TTL_HOURS: int = 24
     LEADERBOARD_REFRESH_MINUTES: int = 5
 
+    # Read Replica (optional)
+    REPLICA_DATABASE_URL: str | None = None
+
+    # CDN / Object Storage
+    CDN_BASE_URL: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
