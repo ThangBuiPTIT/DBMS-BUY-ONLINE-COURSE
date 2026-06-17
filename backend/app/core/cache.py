@@ -53,7 +53,11 @@ class RedisCache:
         if not self.enabled:
             return None
         data = await self._redis.get(key)
-        return json.loads(data) if data else None
+        if data:
+            self._hits += 1
+            return json.loads(data)
+        self._misses += 1
+        return None
 
     async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
         if not self.enabled:
@@ -91,6 +95,20 @@ class RedisCache:
     async def set_dict_search(self, keyword: str, entries: list[dict]) -> None:
         await self.set(f"dict:search:{keyword.lower()}", entries, ttl=3600)
 
+    # ── Course catalog cache ──
+
+    async def get_course_catalog(self) -> list[dict] | None:
+        return await self.get("catalog:courses:published")
+
+    async def set_course_catalog(self, courses: list[dict]) -> None:
+        await self.set("catalog:courses:published", courses, ttl=600)  # 10 min TTL
+
+    async def get_course_detail_cache(self, course_id: str) -> dict | None:
+        return await self.get(f"catalog:course:{course_id}")
+
+    async def set_course_detail_cache(self, course_id: str, detail: dict) -> None:
+        await self.set(f"catalog:course:{course_id}", detail, ttl=600)
+
     # ── Leaderboard cache (Redis Sorted Set) ──
 
     async def update_leaderboard(self, entries: list[dict]) -> None:
@@ -113,6 +131,28 @@ class RedisCache:
             "leaderboard:streaks", 0, limit - 1, withscores=True
         )
         return [{"full_name": name, "current_streak": int(score)} for name, score in result]
+
+
+    # ── Microlearning leaderboard (Redis Sorted Set) ──
+
+    async def update_microlearning_score(self, student_name: str, score: int) -> None:
+        """ZINCRBY: atomic increment of student score."""
+        if not self.enabled:
+            return
+        await self._redis.zincrby("microlearning:scores", score, student_name)
+        await self._redis.expire("microlearning:scores", 86400)
+
+    async def get_microlearning_leaderboard(self, limit: int = 20) -> list[dict]:
+        """Get top microlearning students from ZSET."""
+        if not self.enabled:
+            return []
+        result = await self._redis.zrevrange(
+            "microlearning:scores", 0, limit - 1, withscores=True
+        )
+        return [
+            {"rank": i + 1, "full_name": name, "score": int(score)}
+            for i, (name, score) in enumerate(result)
+        ]
 
 
 # Singleton

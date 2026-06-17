@@ -6,8 +6,24 @@ from app.core.security import is_valid_uuid
 
 
 async def get_store_courses(db: AsyncSession, student_id: str) -> list[dict]:
-    """Get published courses for the storefront using v_published_courses view."""
+    """Get published courses for the storefront using v_published_courses view.
+    Uses Redis cache-aside when enabled."""
     clean_sid = student_id if is_valid_uuid(student_id) else "00000000-0000-0000-0000-000000000000"
+
+    # Try Redis cache first (catalog-level, not per-student)
+    from app.core.cache import cache
+    if cache.enabled:
+        cached = await cache.get_course_catalog()
+        if cached is not None:
+            # Layer per-student enrollment check on top of cached catalog
+            for c in cached:
+                enrolled = any(
+                    e["student_id"] == clean_sid
+                    for e in c.get("_enrollments", [])
+                ) if "_enrollments" in c else False
+                c["is_enrolled"] = enrolled
+            return cached
+
     result = await db.execute(
         text("""
             SELECT
@@ -30,7 +46,14 @@ async def get_store_courses(db: AsyncSession, student_id: str) -> list[dict]:
         """),
         {"sid": clean_sid},
     )
-    return [dict(row) for row in result.mappings()]
+    courses = [dict(row) for row in result.mappings()]
+
+    # Write to Redis cache (without per-user enrollment data)
+    if cache.enabled:
+        cacheable = [{k: v for k, v in c.items() if k != "is_enrolled"} for c in courses]
+        await cache.set_course_catalog(cacheable)
+
+    return courses
 
 
 async def get_wallet(db: AsyncSession, user_id: str) -> dict:
