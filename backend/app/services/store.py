@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.isolation import serializable
 from app.core.security import is_valid_uuid
 
 
@@ -113,6 +114,56 @@ async def refund_course(db: AsyncSession, student_id: str, course_id: str, reaso
     except Exception as e:
         await db.rollback()
         raise StoreError(str(e), 500)
+
+
+# ── Phase 3: Transfer & SERIALIZABLE Checkout ──
+
+async def transfer_funds(
+    db: AsyncSession, from_user_id: str, to_user_id: str, amount: float, message: str = ""
+) -> dict:
+    """Chuyển tiền giữa 2 user với SERIALIZABLE isolation + deadlock prevention."""
+    if not is_valid_uuid(from_user_id) or not is_valid_uuid(to_user_id):
+        raise StoreError("ID không hợp lệ", 400)
+
+    async with serializable(db):
+        try:
+            await db.execute(
+                text("CALL sp_transfer_funds(:fid, :tid, :amt, :msg)"),
+                {"fid": from_user_id, "tid": to_user_id, "amt": amount, "msg": message or f"Chuyen {amount}"},
+            )
+            return {"from": from_user_id, "to": to_user_id, "amount": amount, "status": "SUCCESS"}
+        except Exception as e:
+            err_msg = str(e)
+            if "Số dư không đủ" in err_msg:
+                raise StoreError("Số dư không đủ", 400)
+            if "tự chuyển" in err_msg.lower():
+                raise StoreError("Không thể tự chuyển tiền", 400)
+            raise StoreError(err_msg, 500)
+
+
+async def checkout_course_v2(db: AsyncSession, student_id: str, course_id: str) -> dict:
+    """Buy course using sp_enroll_paid_course with SERIALIZABLE isolation."""
+    if not is_valid_uuid(student_id) or not is_valid_uuid(course_id):
+        raise StoreError("ID không hợp lệ", 400)
+
+    async with serializable(db):
+        try:
+            await db.execute(
+                text("CALL sp_enroll_paid_course(:sid, :cid)"),
+                {"sid": student_id, "cid": course_id},
+            )
+            return {"message": "Đăng ký khóa học thành công", "status": "SUCCESS"}
+        except Exception as e:
+            err_msg = str(e)
+            if "Số dư không đủ" in err_msg:
+                raise StoreError("Số dư không đủ để mua khóa học này", 400)
+            if "không tồn tại" in err_msg.lower():
+                raise StoreError("Khóa học không tồn tại hoặc chưa publish", 400)
+            if "miễn phí" in err_msg.lower():
+                raise StoreError("Khóa học miễn phí — không cần thanh toán", 400)
+            if "đã đăng ký" in err_msg.lower() or "duplicate" in err_msg.lower():
+                raise StoreError("Bạn đã đăng ký khóa học này", 409)
+            raise StoreError(err_msg, 500)
 
 
 async def get_user_transactions(

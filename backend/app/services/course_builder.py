@@ -487,6 +487,64 @@ async def get_course_categories(db: AsyncSession) -> list[dict]:
     return [dict(row) for row in result.mappings()]
 
 
+# ── Phase 3: Optimistic Locking ──
+
+class ConflictError(Exception):
+    def __init__(self, message: str, status_code: int = 409):
+        self.message = message
+        self.status_code = status_code
+
+
+async def update_course_with_optimistic_lock(
+    db: AsyncSession, course_id: str, req, expected_updated_at: str
+) -> dict:
+    """Cập nhật khóa học với optimistic locking.
+    expected_updated_at: giá trị updated_at lúc client mở form edit.
+    Nếu có ai sửa sau đó → 0 rows affected → conflict error."""
+    updates = []
+    params = {"cid": course_id, "expected_ts": expected_updated_at}
+
+    if req.title is not None:
+        updates.append("title = :title")
+        params["title"] = req.title
+    if req.description is not None:
+        updates.append("description = :desc")
+        params["desc"] = req.description
+    if req.image_url is not None:
+        updates.append("image_url = :img")
+        params["img"] = req.image_url
+    if req.price is not None:
+        updates.append("price = :price")
+        params["price"] = req.price
+    if req.category_id is not None:
+        updates.append("category_id = :cat")
+        params["cat"] = req.category_id
+
+    if updates:
+        result = await db.execute(
+            text(f"""
+                UPDATE general_courses
+                SET {', '.join(updates)}
+                WHERE course_id = :cid
+                  AND is_deleted = FALSE
+                  AND updated_at = :expected_ts
+                RETURNING updated_at
+            """),
+            params,
+        )
+        row = result.mappings().first()
+        await db.commit()
+
+        if row is None:
+            raise ConflictError(
+                "Khóa học đã được cập nhật bởi người khác. Vui lòng tải lại trang.",
+                409,
+            )
+        return {"course_id": course_id, "updated": True, "new_updated_at": str(row["updated_at"])}
+
+    return {"course_id": course_id, "updated": False, "message": "Không có thay đổi"}
+
+
 # ── Phase 2: Progress (sp_update_course_progress) ──
 
 async def update_course_progress(db: AsyncSession, req) -> dict:

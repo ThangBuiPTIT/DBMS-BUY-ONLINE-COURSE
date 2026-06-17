@@ -257,7 +257,93 @@ BEGIN
 END;
 $$;
 
--- 3.5 Ban tài khoản vi phạm
+-- 3.5 Chuyển tiền giữa 2 ví — Full ACID + chống Deadlock
+-- Tác dụng: Chuyển tiền an toàn giữa 2 user bất kỳ.
+--          Tự động sắp xếp thứ tự khóa để tránh deadlock.
+--          Ghi log giao dịch đầy đủ.
+CREATE OR REPLACE PROCEDURE sp_transfer_funds(
+    p_from   UUID,
+    p_to     UUID,
+    p_amount NUMERIC,
+    p_message TEXT DEFAULT 'Chuyển tiền'
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_from_balance NUMERIC;
+    v_tx_id        UUID;
+    v_first        UUID;
+    v_second       UUID;
+BEGIN
+    -- (1) Validate input
+    IF p_amount <= 0 THEN
+        RAISE EXCEPTION 'Số tiền phải > 0 (received: %)', p_amount;
+    END IF;
+    IF p_from = p_to THEN
+        RAISE EXCEPTION 'Không thể tự chuyển tiền cho chính mình';
+    END IF;
+
+    -- (2) DEADLOCK PREVENTION: luôn khóa hàng theo thứ tự user_id cố định
+    IF p_from < p_to THEN
+        v_first := p_from; v_second := p_to;
+    ELSE
+        v_first := p_to;   v_second := p_from;
+    END IF;
+
+    PERFORM 1 FROM wallets WHERE user_id = v_first  FOR UPDATE;
+    PERFORM 1 FROM wallets WHERE user_id = v_second FOR UPDATE;
+
+    -- (3) Kiểm tra số dư SAU khi đã khóa (tránh race condition)
+    SELECT balance INTO v_from_balance FROM wallets WHERE user_id = p_from;
+    IF v_from_balance < p_amount THEN
+        RAISE EXCEPTION 'Số dư không đủ (balance: %, need: %)', v_from_balance, p_amount;
+    END IF;
+
+    -- (4) Atomic execution
+    UPDATE wallets SET balance = balance - p_amount WHERE user_id = p_from;
+    UPDATE wallets SET balance = balance + p_amount WHERE user_id = p_to;
+
+    INSERT INTO transaction_logs (from_wallet_user_id, to_wallet_user_id, amount, status, message)
+    VALUES (p_from, p_to, p_amount, 'SUCCESS', p_message)
+    RETURNING transaction_id INTO v_tx_id;
+
+    INSERT INTO transaction_action_logs (transaction_id, action_type, message)
+    VALUES (v_tx_id, 'TRANSFER_COMPLETE', 'OK');
+END;
+$$;
+
+-- 3.6 Đăng ký khóa học trả phí (Gộp chuyển tiền + ghi danh)
+-- Tác dụng: 1 transaction duy nhất: trừ tiền học viên → cộng tiền giáo viên → ghi danh
+CREATE OR REPLACE PROCEDURE sp_enroll_paid_course(
+    p_student UUID,
+    p_course  UUID
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_price   NUMERIC;
+    v_teacher UUID;
+BEGIN
+    SELECT c.price, c.teacher_id INTO v_price, v_teacher
+    FROM general_courses c
+    WHERE c.course_id = p_course
+      AND c.visibility_status = 'PUBLISHED'
+      AND c.is_deleted = FALSE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Khóa học không tồn tại hoặc chưa được publish';
+    END IF;
+
+    IF v_price <= 0 THEN
+        RAISE EXCEPTION 'Khóa học miễn phí — không cần thanh toán';
+    END IF;
+
+    CALL sp_transfer_funds(p_student, v_teacher, v_price, 'Mua khóa học: ' || p_course::text);
+
+    INSERT INTO course_enrollments (student_id, course_id, progress)
+    VALUES (p_student, p_course, 0.00);
+END;
+$$;
+
+-- 3.7 Ban tài khoản vi phạm
 -- Tác dụng: Đóng băng tài khoản và xóa tất cả phiên đăng nhập hiện tại để kick user ra ngoài.
 CREATE OR REPLACE PROCEDURE sp_ban_user(p_user_id UUID, p_reason TEXT)
 LANGUAGE plpgsql AS $$

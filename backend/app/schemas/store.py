@@ -68,6 +68,27 @@ class UserTransactionListResponse(BaseModel):
     offset: int
 
 
+# ── Phase 3: Transfer ──
+
+class TransferRequest(BaseModel):
+    from_user_id: str
+    to_user_id: str
+    amount: float = Field(gt=0)
+    message: str = ""
+
+
+class TransferResponse(BaseModel):
+    from_user: str
+    to_user: str
+    amount: float
+    status: str
+
+
+class CheckoutV2Request(BaseModel):
+    student_id: str
+    course_id: str
+
+
 class WalletAuditResponse(BaseModel):
     user_id: str
     wallet_balance: float

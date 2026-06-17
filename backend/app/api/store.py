@@ -5,9 +5,11 @@ from app.core.deps import get_current_admin, get_db
 from app.models.user import User
 from app.schemas.store import (
     CheckoutRequest,
+    CheckoutV2Request,
     RefundRequest,
     StoreSuccessResponse,
     TopupRequest,
+    TransferRequest,
     UserTransactionListResponse,
     WalletInfoResponse,
 )
@@ -89,6 +91,41 @@ async def refund_course(
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"status": "SUCCESS", "message": "Hoàn tiền thành công"}
+
+
+# ── Phase 3: Transfer & SERIALIZABLE Checkout ──
+
+@router.post("/api/wallet/transfer")
+async def transfer_funds(
+    req: TransferRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Chuyển tiền giữa 2 user. SERIALIZABLE isolation + deadlock prevention."""
+    try:
+        result = await store_service.transfer_funds(
+            db, req.from_user_id, req.to_user_id, req.amount, req.message
+        )
+        return result
+    except StoreError as e:
+        raise HTTPException(e.status_code, e.message)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.post("/api/store/checkout/v2", response_model=StoreSuccessResponse)
+async def checkout_course_v2(
+    req: CheckoutV2Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Mua khóa học — sp_enroll_paid_course với SERIALIZABLE isolation.
+    Trả tiền cho giáo viên (thay vì admin như v1)."""
+    try:
+        result = await store_service.checkout_course_v2(db, req.student_id, req.course_id)
+        return {"status": "SUCCESS", "message": result["message"]}
+    except StoreError as e:
+        raise HTTPException(e.status_code, e.message)
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @router.get("/api/wallet/{user_id}/transactions", response_model=UserTransactionListResponse)
