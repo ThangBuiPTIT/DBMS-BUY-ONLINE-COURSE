@@ -12,7 +12,7 @@ import {
   Filter
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = useState([]);

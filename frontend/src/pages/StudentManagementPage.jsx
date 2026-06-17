@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useDebounce } from '../hooks/useDebounce';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
 function StudentManagementPage() {
   const [activeTab, setActiveTab] = useState('progress');
   const [progressData, setProgressData] = useState([]);
@@ -32,8 +34,8 @@ function StudentManagementPage() {
     setError('');
     try {
       const [progressRes, inactiveRes] = await Promise.all([
-        axios.get('http://localhost:8080/api/students/progress'),
-        axios.get('http://localhost:8080/api/students/inactive'),
+        axios.get(`${API_URL}/api/students/progress`),
+        axios.get(`${API_URL}/api/students/inactive`),
       ]);
       setProgressData(progressRes.data || []);
       setInactiveData(inactiveRes.data || []);
@@ -47,7 +49,7 @@ function StudentManagementPage() {
 
   const handleSearch = async (query) => {
     try {
-      const res = await axios.get(`http://localhost:8080/api/students/search?keyword=${encodeURIComponent(query)}`);
+      const res = await axios.get(`${API_URL}/api/students/search?keyword=${encodeURIComponent(query)}`);
       setSearchResults(res.data || []);
     } catch (err) {
       console.error(err);

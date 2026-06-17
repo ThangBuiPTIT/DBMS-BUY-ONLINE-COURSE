@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 // ---- Helpers ----
 const isYouTube = (url) => url && (url.includes('youtube.com') || url.includes('youtu.be'));

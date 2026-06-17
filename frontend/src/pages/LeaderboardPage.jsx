@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 // ---- Hằng số ----
 const STUDENT_ID = '74cc1ba2-509e-4348-8722-a0a84f8ee266';

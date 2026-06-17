@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
 function CourseStorePage() {
   const [courses, setCourses] = useState([]);
   const [wallet, setWallet] = useState({ balance: 0.0, updated_at: '' });
@@ -22,8 +24,8 @@ function CourseStorePage() {
     setLoading(true);
     try {
       const [coursesRes, walletRes] = await Promise.all([
-        axios.get(`http://localhost:8080/api/store/courses?student_id=${STUDENT_ID}`),
-        axios.get(`http://localhost:8080/api/wallet/${STUDENT_ID}`)
+        axios.get(`${API_URL}/api/store/courses?student_id=${STUDENT_ID}`),
+        axios.get(`${API_URL}/api/wallet/${STUDENT_ID}`)
       ]);
       setCourses(coursesRes.data || []);
       setWallet(walletRes.data || { balance: 0.0 });
@@ -39,14 +41,14 @@ function CourseStorePage() {
     setSubmittingTopup(true);
     const topupToast = toast.loading('Đang xử lý nạp tiền...');
     try {
-      await axios.post('http://localhost:8080/api/wallet/topup', {
+      await axios.post(`${API_URL}/api/wallet/topup`, {
         user_id: STUDENT_ID,
         amount: amount,
         message: 'Nạp nhanh 500k từ Cửa hàng'
       });
-      
+
       // Reload wallet balance
-      const walletRes = await axios.get(`http://localhost:8080/api/wallet/${STUDENT_ID}`);
+      const walletRes = await axios.get(`${API_URL}/api/wallet/${STUDENT_ID}`);
       setWallet(walletRes.data || { balance: 0.0 });
       
       toast.success(`Nạp thành công ${formatCurrency(amount)} vào ví!`, { id: topupToast });
@@ -64,7 +66,7 @@ function CourseStorePage() {
     setSubmittingCheckout(true);
     const checkoutToast = toast.loading('Đang thực hiện thanh toán...');
     try {
-      await axios.post('http://localhost:8080/api/store/checkout', {
+      await axios.post(`${API_URL}/api/store/checkout`, {
         student_id: STUDENT_ID,
         course_id: checkoutCourse.course_id
       });

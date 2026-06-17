@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Bell, Check, Clock, MailOpen } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export default function NotificationBell({ userId }) {
   const [notifications, setNotifications] = useState([]);
