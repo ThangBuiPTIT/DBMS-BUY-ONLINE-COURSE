@@ -4,26 +4,29 @@ from app.core.security import is_valid_uuid
 
 
 async def get_store_courses(db: AsyncSession, student_id: str) -> list[dict]:
-    """Get published courses for the storefront."""
-    clean_student_id = student_id if is_valid_uuid(student_id) else "00000000-0000-0000-0000-000000000000"
+    """Get published courses for the storefront using v_published_courses view."""
+    clean_sid = student_id if is_valid_uuid(student_id) else "00000000-0000-0000-0000-000000000000"
     result = await db.execute(
         text("""
             SELECT
-                c.course_id::text,
-                c.title,
-                COALESCE(c.description, '') AS description,
-                COALESCE(c.image_url, '') AS image_url,
-                c.price,
-                c.visibility_status,
-                COALESCE(up.full_name, 'Giảng viên') AS teacher_name,
-                EXISTS(SELECT 1 FROM course_enrollments e
-                       WHERE e.course_id = c.course_id AND e.student_id = :student_id) AS is_enrolled
-            FROM general_courses c
-            LEFT JOIN user_profiles up ON c.teacher_id = up.user_id
-            WHERE c.visibility_status = 'PUBLISHED' AND c.is_deleted = FALSE
-            ORDER BY c.updated_at DESC
+                v.course_id::text,
+                v.title,
+                v.description,
+                v.image_url,
+                v.price,
+                'PUBLISHED' AS visibility_status,
+                v.category_name,
+                v.teacher_name,
+                v.enrollment_count,
+                v.updated_at,
+                EXISTS(
+                    SELECT 1 FROM course_enrollments e
+                    WHERE e.course_id = v.course_id AND e.student_id = :sid
+                ) AS is_enrolled
+            FROM v_published_courses v
+            ORDER BY v.updated_at DESC
         """),
-        {"student_id": clean_student_id},
+        {"sid": clean_sid},
     )
     return [dict(row) for row in result.mappings()]
 

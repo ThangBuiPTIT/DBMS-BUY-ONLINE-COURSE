@@ -20,7 +20,7 @@ async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
     # Fallback to Materialized View
     try:
         result = await db.execute(
-            text("SELECT * FROM mv_leaderboard ORDER BY rank ASC LIMIT :limit"),
+            text("SELECT student_id::text, full_name, avatar_url, current_streak, highest_streak, achievement_count, rank FROM mv_leaderboard ORDER BY rank ASC LIMIT :limit"),
             {"limit": limit},
         )
         return [dict(row) for row in result.mappings()]
@@ -33,7 +33,7 @@ async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
                     COALESCE(avatar_url, '') AS avatar_url,
                     current_streak,
                     highest_streak,
-                    total_achievements
+                    total_achievements AS achievement_count
                 FROM vw_top_learners_leaderboard
                 LIMIT :limit
             """),
@@ -43,6 +43,7 @@ async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
         for rank, row in enumerate(result.mappings(), start=1):
             entry = dict(row)
             entry["rank"] = rank
+            entry["student_id"] = ""  # view doesn't expose student_id
             entries.append(entry)
         return entries
 
@@ -54,7 +55,9 @@ async def refresh_leaderboard(db: AsyncSession) -> None:
 
     # Đồng bộ Redis ZSET
     if cache.enabled:
-        result = await db.execute(text("SELECT * FROM mv_leaderboard ORDER BY rank ASC"))
+        result = await db.execute(
+            text("SELECT full_name, current_streak FROM mv_leaderboard ORDER BY rank ASC")
+        )
         await cache.update_leaderboard([dict(row) for row in result.mappings()])
 
 

@@ -25,3 +25,18 @@ async def get_inactive_students(db: AsyncSession) -> list[dict]:
         text("SELECT enrollment_id::text, student_id::text, full_name, phone_number, course_title, last_activity_date FROM vw_inactive_students")
     )
     return [dict(row) for row in result.mappings()]
+
+
+async def get_student_dashboard(db: AsyncSession, student_id: str) -> dict | None:
+    """Get student dashboard summary from v_student_dashboard view."""
+    result = await db.execute(
+        text("""
+            SELECT student_id::text, full_name, current_streak, highest_streak,
+                   enrolled_courses, achievements, avg_progress
+            FROM v_student_dashboard
+            WHERE student_id = :uid
+        """),
+        {"uid": student_id},
+    )
+    row = result.mappings().first()
+    return dict(row) if row else None
