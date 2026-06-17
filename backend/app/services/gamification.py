@@ -17,7 +17,7 @@ async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
                 {"rank": i + 1, **entry} for i, entry in enumerate(redis_entries)
             ]
 
-    # Fallback to Materialized View
+    # Fallback to Materialized View (mv_leaderboard may not exist on this DB)
     try:
         result = await db.execute(
             text("SELECT * FROM mv_leaderboard ORDER BY rank ASC LIMIT :limit"),
@@ -25,7 +25,13 @@ async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
         )
         return [dict(row) for row in result.mappings()]
     except Exception:
-        # Fallback to view if mv doesn't exist yet
+        # mv_leaderboard doesn't exist — rollback the failed transaction
+        # so the fallback SELECT below can run in a clean transaction.
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        # Fallback to view
         result = await db.execute(
             text("""
                 SELECT
@@ -49,8 +55,27 @@ async def get_leaderboard(db: AsyncSession, limit: int = 20) -> list[dict]:
 
 async def refresh_leaderboard(db: AsyncSession) -> None:
     """Refresh materialized view + Redis cache. Gọi định kỳ hoặc sau khi sync streak."""
-    await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_leaderboard"))
-    await db.commit()
+    try:
+        await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_leaderboard"))
+        await db.commit()
+    except Exception:
+        # mv_leaderboard doesn't exist on this DB — nothing to refresh.
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        if cache.enabled:
+            # Best-effort: rebuild Redis ZSET from the leaderboard view.
+            result = await db.execute(
+                text("""
+                    SELECT
+                        full_name,
+                        current_streak
+                    FROM vw_top_learners_leaderboard
+                """)
+            )
+            await cache.update_leaderboard([dict(row) for row in result.mappings()])
+        return
 
     # Đồng bộ Redis ZSET
     if cache.enabled:

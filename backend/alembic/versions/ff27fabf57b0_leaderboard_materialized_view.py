@@ -21,7 +21,11 @@ def upgrade() -> None:
         CREATE MATERIALIZED VIEW IF NOT EXISTS mv_leaderboard AS
         SELECT
             ROW_NUMBER() OVER (
-                ORDER BY ss.current_streak DESC, total_achievements DESC
+                ORDER BY ss.current_streak DESC, (
+                    SELECT COUNT(*)
+                    FROM user_achievements ua
+                    WHERE ua.user_id = s.user_id
+                ) DESC
             ) AS rank,
             up.full_name,
             up.avatar_url,

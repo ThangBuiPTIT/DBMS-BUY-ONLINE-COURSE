@@ -29,8 +29,8 @@ def upgrade() -> None:
     """)
 
     for tbl in ['users', 'dictionary_entries', 'general_courses', 'wallets']:
+        op.execute(f"DROP TRIGGER IF EXISTS trg_auto_updated_at ON {tbl}")
         op.execute(f"""
-            DROP TRIGGER IF EXISTS trg_auto_updated_at ON {tbl};
             CREATE TRIGGER trg_auto_updated_at
             BEFORE UPDATE ON {tbl}
             FOR EACH ROW EXECUTE FUNCTION fn_auto_update_timestamp();

@@ -28,8 +28,10 @@ def upgrade() -> None:
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
+    """)
 
-        DROP TRIGGER IF EXISTS trg_create_student_streak ON students;
+    op.execute("DROP TRIGGER IF EXISTS trg_create_student_streak ON students")
+    op.execute("""
         CREATE TRIGGER trg_create_student_streak
         AFTER INSERT ON students
         FOR EACH ROW EXECUTE FUNCTION fn_create_student_streak();

@@ -26,8 +26,10 @@ def upgrade() -> None:
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
+    """)
 
-        DROP TRIGGER IF EXISTS trg_provision_wallet ON users;
+    op.execute("DROP TRIGGER IF EXISTS trg_provision_wallet ON users")
+    op.execute("""
         CREATE TRIGGER trg_provision_wallet
         AFTER INSERT ON users
         FOR EACH ROW EXECUTE FUNCTION fn_provision_wallet();
