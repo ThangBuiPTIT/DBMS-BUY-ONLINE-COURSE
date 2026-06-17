@@ -73,6 +73,59 @@ async def search_entries(db: AsyncSession, keyword: str) -> list[dict]:
     return entries
 
 
+# ── Phase 4: Full-Text Search ──
+
+async def search_entries_fts(db: AsyncSession, query: str, limit: int = 30) -> list[dict]:
+    """Full-Text Search using tsvector/tsquery with prefix matching."""
+    words = query.strip().split()
+    tsquery_parts = []
+    for w in words:
+        clean = w.replace("'", "").replace("\\", "")
+        if clean:
+            tsquery_parts.append(f"{clean}:*")
+    if not tsquery_parts:
+        return []
+    tsquery = " & ".join(tsquery_parts)
+
+    result = await db.execute(
+        text("""
+            SELECT e.entry_id::text, e.word, e.meaning, e.updated_at,
+                   ts_rank(
+                       to_tsvector('simple', COALESCE(e.word,'') || ' ' || COALESCE(e.meaning,'')),
+                       to_tsquery('simple', :query)
+                   ) AS relevance
+            FROM dictionary_entries e
+            WHERE e.is_deleted = FALSE
+              AND to_tsvector('simple', COALESCE(e.word,'') || ' ' || COALESCE(e.meaning,''))
+                  @@ to_tsquery('simple', :query)
+            ORDER BY relevance DESC
+            LIMIT :limit
+        """),
+        {"query": tsquery, "limit": limit},
+    )
+    entries = [dict(row) for row in result.mappings()]
+    # Batch fetch variations
+    entry_ids = [e["entry_id"] for e in entries]
+    if entry_ids:
+        placeholders = ", ".join(f":eid{i}" for i in range(len(entry_ids)))
+        params = {f"eid{i}": eid for i, eid in enumerate(entry_ids)}
+        var_result = await db.execute(
+            text(f"""
+                SELECT variation_id::text, entry_id::text, region, video_url, description
+                FROM dictionary_variations WHERE entry_id IN ({placeholders}) ORDER BY region
+            """),
+            params,
+        )
+        vm: dict[str, list] = {eid: [] for eid in entry_ids}
+        for row in var_result.mappings():
+            d = dict(row)
+            eid = d.pop("entry_id")
+            vm[eid].append(d)
+        for entry in entries:
+            entry["variations"] = vm.get(entry["entry_id"], [])
+    return entries
+
+
 async def get_categories(db: AsyncSession) -> list[dict]:
     """Get dictionary categories."""
     result = await db.execute(

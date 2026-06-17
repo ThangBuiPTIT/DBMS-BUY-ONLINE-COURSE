@@ -128,6 +128,18 @@ async def checkout_course_v2(
         raise HTTPException(500, str(e))
 
 
+@router.get("/api/wallet/{user_id}/transactions/v2")
+async def get_user_transactions_cursor(
+    user_id: str,
+    limit: int = Query(20, gt=0),
+    cursor: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lịch sử giao dịch với keyset pagination (cursor-based)."""
+    page = await store_service.get_user_transactions_cursor(db, user_id, limit, cursor)
+    return page.to_response()
+
+
 @router.get("/api/wallet/{user_id}/transactions", response_model=UserTransactionListResponse)
 async def get_user_transactions(
     user_id: str,

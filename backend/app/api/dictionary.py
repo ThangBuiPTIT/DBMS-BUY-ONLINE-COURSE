@@ -21,6 +21,17 @@ async def get_categories(db: AsyncSession = Depends(get_db)):
     return await dictionary_service.get_categories(db)
 
 
+@router.get("/search/fts")
+async def search_entries_fts(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(30, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full-Text Search với prefix matching và relevance ranking."""
+    entries = await dictionary_service.search_entries_fts(db, q, limit)
+    return {"entries": entries, "total": len(entries), "query": q}
+
+
 @router.get("/entries/{entry_id}/variations")
 async def get_variations(entry_id: str, db: AsyncSession = Depends(get_db)):
     if not entry_id:

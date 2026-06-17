@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.isolation import serializable
+from app.core.pagination import CursorPage, decode_cursor, encode_cursor
 from app.core.security import is_valid_uuid
 
 
@@ -164,6 +165,60 @@ async def checkout_course_v2(db: AsyncSession, student_id: str, course_id: str) 
             if "đã đăng ký" in err_msg.lower() or "duplicate" in err_msg.lower():
                 raise StoreError("Bạn đã đăng ký khóa học này", 409)
             raise StoreError(err_msg, 500)
+
+
+# ── Phase 4: Keyset Pagination ──
+
+async def get_user_transactions_cursor(
+    db: AsyncSession, user_id: str, limit: int = 20, cursor: str | None = None
+) -> CursorPage:
+    """Lịch sử giao dịch với keyset pagination (cursor-based)."""
+    if not is_valid_uuid(user_id):
+        return CursorPage([], None, False)
+
+    cursor_ts = None
+    if cursor:
+        try:
+            cursor_ts = decode_cursor(cursor)
+        except Exception:
+            cursor_ts = None
+
+    if cursor_ts:
+        result = await db.execute(
+            text("""
+                SELECT tl.transaction_id::text, tl.created_at, tl.amount, tl.status, tl.message,
+                       CASE WHEN tl.from_wallet_user_id = :uid THEN 'OUT' ELSE 'IN' END AS direction
+                FROM transaction_logs tl
+                WHERE (tl.from_wallet_user_id = :uid OR tl.to_wallet_user_id = :uid)
+                  AND tl.status = 'SUCCESS' AND tl.created_at < :cursor_ts
+                ORDER BY tl.created_at DESC LIMIT :limit
+            """),
+            {"uid": user_id, "cursor_ts": cursor_ts, "limit": limit + 1},
+        )
+    else:
+        result = await db.execute(
+            text("""
+                SELECT tl.transaction_id::text, tl.created_at, tl.amount, tl.status, tl.message,
+                       CASE WHEN tl.from_wallet_user_id = :uid THEN 'OUT' ELSE 'IN' END AS direction
+                FROM transaction_logs tl
+                WHERE (tl.from_wallet_user_id = :uid OR tl.to_wallet_user_id = :uid)
+                  AND tl.status = 'SUCCESS'
+                ORDER BY tl.created_at DESC LIMIT :limit
+            """),
+            {"uid": user_id, "limit": limit + 1},
+        )
+
+    rows = [dict(row) for row in result.mappings()]
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+
+    next_cursor = None
+    if has_more and rows:
+        last_ts = rows[-1]["created_at"]
+        next_cursor = encode_cursor(last_ts.isoformat())
+
+    return CursorPage(rows, next_cursor, has_more)
 
 
 async def get_user_transactions(
