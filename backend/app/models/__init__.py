@@ -43,6 +43,7 @@ from app.models.gamification import (  # noqa: E402, F401
     UserAchievement,
     UserFeedback,
 )
+from app.models.certificate import Certificate  # noqa: E402, F401
 from app.models.notification import (  # noqa: E402, F401
     Log,
     AuditLog,

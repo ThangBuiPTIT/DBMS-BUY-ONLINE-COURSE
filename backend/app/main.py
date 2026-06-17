@@ -5,13 +5,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from fastapi import Depends
+from fastapi import Depends, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import text as sa_text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.router import api_router
 from app.core.cache import cache
 from app.core.config import settings
 from app.core.database import async_session, engine, get_db
+from app.core.error_handlers import generic_exception_handler, integrity_error_handler
 
 
 async def _prewarm_hot_tables():
@@ -109,6 +113,10 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+# Global exception handlers
+app.add_exception_handler(IntegrityError, integrity_error_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
 
 
 @app.get("/api/health")
