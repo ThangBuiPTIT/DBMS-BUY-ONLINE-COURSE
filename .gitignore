@@ -39,3 +39,6 @@ npm-debug.log*
 
 # Vite cache
 frontend/.vite/
+
+# Local source folder (not tracked - source of truth is at root)
+DBMS-BUY-ONLINE-COURSE/

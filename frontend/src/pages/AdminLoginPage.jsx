@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { motion } from 'framer-motion';
+import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
-const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8081';
+
+const LogoIcon = ({ className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 40 40" className={className} xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="2" width="36" height="36" rx="10" fill="currentColor" className="text-gray-900"/>
+    <path d="M12 14 L20 10 L28 14 L28 22 L20 26 L12 22 Z" stroke="white" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+    <circle cx="20" cy="18" r="3" fill="white"/>
+  </svg>
+);
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -15,10 +24,12 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError('');
     setSuccess('');
+
     if (!username.trim() || !password) {
-      setError('Vui lòng điền đầy đủ tên đăng nhập và mật khẩu');
+      setError('Vui lòng nhập đầy đủ tài khoản và mật khẩu');
       return;
     }
+
     setLoading(true);
     try {
       const response = await axios.post(`${API_URL}/api/auth/admin-login`, {
@@ -28,149 +39,168 @@ export default function AdminLoginPage() {
       const { session_key, user, message } = response.data;
       localStorage.setItem('session_key', session_key);
       localStorage.setItem('admin_user', JSON.stringify(user));
-      setSuccess(message || 'Đăng nhập thành công! Đang chuyển hướng...');
-      setTimeout(() => { window.location.href = '/admin/dashboard'; }, 1500);
+      localStorage.setItem('role_name', user.role_name);
+      setSuccess(message || 'Đăng nhập thành công');
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      const target = redirect || (user.role_name === 'TEACHER' ? '/teacher/dashboard'
+        : user.role_name === 'STUDENT' ? '/student/dashboard'
+        : '/admin/dashboard');
+      setTimeout(() => { window.location.href = target; }, 800);
     } catch (err) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.error || 'Kết nối tới máy chủ thất bại. Vui lòng thử lại sau.');
+      setError(err.response?.data?.error || 'Không thể kết nối tới máy chủ.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-base flex items-center justify-center font-sans px-4">
-      {/* Decorative background blobs */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-50 pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-50 pointer-events-none translate-x-1/2 translate-y-1/2" />
-
-      <div className="relative w-full max-w-md">
-        {/* Logo & Title */}
-        <div className="text-center mb-8">
-          <div className="inline-flex p-4 rounded-2xl bg-primary/10 border border-primary/20 mb-4 shadow-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-9 h-9 text-primary">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A57.778 57.778 0 0 1 12 8c1.766 0 3.482.156 5.14.458V15" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-extrabold text-heading tracking-tight">Hệ Thống Quản Trị</h1>
-          <p className="text-muted mt-2 text-sm">Nền tảng học trực tuyến Ngôn ngữ Ký hiệu</p>
+    <div className="min-h-screen bg-white font-sans text-gray-900 flex">
+      {/* LEFT — Form */}
+      <div className="w-full lg:w-[480px] flex flex-col p-8 lg:p-12 justify-between min-h-screen">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.location.href = '/'}>
+          <LogoIcon className="w-7 h-7" />
+          <span className="text-base font-semibold tracking-tight">SignLearn</span>
         </div>
 
-        {/* Login Card */}
-        <div className="card p-8 shadow-lg">
-          <h2 className="text-xl font-bold text-heading mb-6 text-center">Đăng nhập Admin</h2>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="my-auto w-full max-w-sm"
+        >
+          <h1 className="text-[32px] font-semibold tracking-[-0.03em] leading-tight mb-2">
+            Chào mừng trở lại.
+          </h1>
+          <p className="text-[14px] text-gray-500 mb-10">
+            Đăng nhập để tiếp tục quản trị hệ thống.
+          </p>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            {/* Username */}
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label className="block text-[12px] font-medium text-gray-700 mb-1.5">
                 Tài khoản
               </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                    <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
-                  </svg>
-                </span>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Nhập username admin..."
-                  className="input-field pl-11"
-                  disabled={loading}
-                />
-              </div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="admin"
+                autoComplete="username"
+                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all"
+                disabled={loading}
+              />
             </div>
 
-            {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              <label className="block text-[12px] font-medium text-gray-700 mb-1.5">
                 Mật khẩu
               </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                    <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
-                  </svg>
-                </span>
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="input-field pl-11 pr-12"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-muted hover:text-primary transition"
-                  tabIndex="-1"
-                >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                      <path d="M3.53 2.47a.75.75 0 0 0-1.06 1.06l18 18a.75.75 0 1 0 1.06-1.06l-18-18ZM22.676 12.553a11.249 11.249 0 0 1-2.631 4.31l-3.099-3.099a5.25 5.25 0 0 0-6.71-6.71L7.759 4.577a11.217 11.217 0 0 1 14.917 7.976ZM10.56 10.56 13.44 13.44a2.25 2.25 0 0 1-2.88-2.88Z" />
-                      <path d="M1.54 10.561a11.176 11.176 0 0 0-1.216 1.992.75.75 0 0 0 0 .614 11.24 11.24 0 0 0 6.643 6.302l-1.428-1.428A9.747 9.747 0 0 1 1.776 12c.31-.69.727-1.326 1.233-1.888l-1.47-1.47Z" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                      <path fillRule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 0 1 0-1.113ZM17.25 12a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </button>
-              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all"
+                disabled={loading}
+              />
             </div>
 
-            {/* Error */}
             {error && (
-              <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-600 p-3.5 rounded-xl text-xs leading-relaxed">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mt-0.5 shrink-0">
-                  <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.401 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
-                </svg>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-start gap-2 bg-red-50 border border-red-100 text-red-600 px-3.5 py-3 rounded-xl text-[12.5px]"
+              >
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" strokeWidth={2} />
                 <span>{error}</span>
-              </div>
+              </motion.div>
             )}
 
-            {/* Success */}
             {success && (
-              <div className="flex items-start gap-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 p-3.5 rounded-xl text-xs leading-relaxed">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mt-0.5 shrink-0">
-                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.748-5.25Z" clipRule="evenodd" />
-                </svg>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-start gap-2 bg-green-50 border border-green-100 text-green-700 px-3.5 py-3 rounded-xl text-[12.5px]"
+              >
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" strokeWidth={2} />
                 <span>{success}</span>
-              </div>
+              </motion.div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3.5 px-4 rounded-xl text-white font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-sm ${
-                loading ? 'bg-blue-300 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover active:scale-[0.98] shadow-blue-200'
-              }`}
+              className="w-full bg-gray-900 hover:bg-gray-800 text-white text-[14px] font-medium py-3 rounded-full transition-all cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
             >
               {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>Đang đăng nhập...</span>
-                </>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
               ) : (
-                <span>Đăng nhập hệ thống</span>
+                <>
+                  Đăng nhập
+                  <ArrowRight className="w-4 h-4" strokeWidth={2} />
+                </>
               )}
             </button>
           </form>
-        </div>
 
-        <p className="text-center text-xs text-muted mt-6">
-          &copy; {new Date().getFullYear()} Nền tảng Học trực tuyến Ngôn ngữ Ký hiệu. All rights reserved.
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">
+              Truy cập nhanh
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => window.location.href = '/student/dashboard'} className="text-[12px] text-gray-600 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-full px-3.5 py-1.5 transition-all">
+                Học viên
+              </button>
+              <button onClick={() => window.location.href = '/teacher/dashboard'} className="text-[12px] text-gray-600 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-full px-3.5 py-1.5 transition-all">
+                Giáo viên
+              </button>
+              <button onClick={() => window.location.href = '/'} className="text-[12px] text-gray-600 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-full px-3.5 py-1.5 transition-all">
+                Trang chủ
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        <p className="text-[11px] text-gray-400">
+          © {new Date().getFullYear()} SignLearn
         </p>
+      </div>
+
+      {/* RIGHT — Visual */}
+      <div className="hidden lg:flex flex-1 bg-gray-50 border-l border-gray-200 items-center justify-center p-12 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0.03),transparent_70%)]"></div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.2 }}
+          className="relative max-w-md"
+        >
+          <div className="text-[11px] uppercase tracking-[0.2em] text-gray-400 mb-4 font-medium">Bảng điều khiển</div>
+          <h2 className="text-[40px] font-semibold tracking-[-0.03em] leading-[1.1] text-gray-900 mb-4">
+            Quản lý hệ thống<br />học tập của bạn.
+          </h2>
+          <p className="text-[15px] text-gray-500 mb-12 leading-relaxed">
+            Theo dõi giao dịch, quản lý người dùng, và phân tích doanh thu trong một giao diện duy nhất.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              { label: 'Tổng học viên', value: '18,432' },
+              { label: 'Khóa học đang hoạt động', value: '32' },
+              { label: 'Doanh thu tháng này', value: '₫284M' },
+            ].map((m) => (
+              <div key={m.label} className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl px-5 py-4">
+                <span className="text-[13px] text-gray-600">{m.label}</span>
+                <span className="text-[15px] font-semibold tracking-tight text-gray-900">{m.value}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
     </div>
   );
