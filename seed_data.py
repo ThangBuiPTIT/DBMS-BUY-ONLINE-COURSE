@@ -1,11 +1,16 @@
+import os
 import psycopg2
+from dotenv import load_dotenv
+
+# Load credentials from backend/.env if it exists
+load_dotenv("backend/.env")
 
 conn = psycopg2.connect(
-    host="localhost",
-    port=5432,
-    database="elearning_db",
-    user="postgres",
-    password="postgres"
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", 5432)),
+    database=os.getenv("DB_NAME", "elearning_db"),
+    user=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASSWORD", "postgres")
 )
 cursor = conn.cursor()
 

@@ -1,0 +1,14 @@
+[project]
+name = "elearning-fastapi"
+version = "1.0.0"
+description = "E-Learning Platform for Sign Language — FastAPI Backend"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.uvicorn]
+host = "0.0.0.0"
+port = 8000
+reload = true

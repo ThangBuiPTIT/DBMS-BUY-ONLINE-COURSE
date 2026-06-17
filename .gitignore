@@ -33,6 +33,9 @@ desktop.ini
 *.suo
 *.user
 
+# Claude Code local config
+.claude/settings.local.json
+
 # Logs
 *.log
 npm-debug.log*
@@ -40,5 +43,10 @@ npm-debug.log*
 # Vite cache
 frontend/.vite/
 
-# Local source folder (not tracked - source of truth is at root)
-DBMS-BUY-ONLINE-COURSE/
+# Phase planning docs (tracked in memory, not in repo)
+docs/Ke_hoach_hoan_thien_codebase.md
+docs/Phase_1_Step_by_Step.md
+docs/Phase_2_Step_by_Step.md
+docs/Phase_3_Step_by_Step.md
+docs/Phase_4_Step_by_Step.md
+docs/Phase_5_Step_by_Step.md
